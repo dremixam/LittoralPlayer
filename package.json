@@ -13,8 +13,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "openapi:types": "openapi-typescript openapi/tidal-player-api.yaml -o src/shared/api-types.ts",
     "openapi:lint": "redocly lint openapi/tidal-player-api.yaml",
-    "package": "npm run build && electron-builder",
-    "package:dir": "npm run build && electron-builder --dir",
+    "package": "npm run build && electron-builder --dir && npm run vmp:sign && electron-builder --prepackaged release/win-unpacked",
+    "package:dir": "npm run build && electron-builder --dir && npm run vmp:sign",
+    "vmp:sign": "node scripts/vmpSign.cjs",
     "postinstall": "py -3 -m castlabs_evs.vmp sign-pkg node_modules/electron/dist || python -m castlabs_evs.vmp sign-pkg node_modules/electron/dist"
   },
   "dependencies": {
@@ -46,6 +47,9 @@
   "build": {
     "appId": "com.maxime.littoral",
     "productName": "Littoral",
+    "electronDownload": {
+      "mirror": "https://github.com/castlabs/electron-releases/releases/download/"
+    },
     "directories": {
       "output": "release"
     },

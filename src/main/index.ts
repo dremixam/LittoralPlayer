@@ -10,13 +10,11 @@ import { registerIpc } from './ipc';
 // (certaines installations Windows bloquent l'auto-install via le sandbox).
 app.commandLine.appendSwitch('enable-features', 'WidevineL3');
 
-// En DEV, le sandbox des utility processes empêche le helper CDM d'extraire le CRX
-// (« Sandbox cannot access executable »). Cela bloque le passage du CDM de
-// status='new' à 'installed'. On désactive UNIQUEMENT en dev — en prod, l'app
-// signée n'a pas ce problème.
-if (process.env.NODE_ENV !== 'production') {
-  app.commandLine.appendSwitch('no-sandbox');
-}
+// Le sandbox des utility processes empêche le helper CDM Castlabs d'extraire
+// le CRX (« Sandbox cannot access executable ») sur Windows, ce qui bloque
+// le passage du CDM de status='new' à 'installed'. On le désactive en dev
+// ET en prod : la signature VMP seule ne suffit pas à débloquer ce cas.
+app.commandLine.appendSwitch('no-sandbox');
 
 // Nom d'app stable -> dossier userData stable (%APPDATA%/Littoral)
 app.setName('Littoral');
@@ -80,7 +78,7 @@ async function createWindow(): Promise<void> {
   createPlayerView(mainWindow);
   attachConsoleBridge();
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (!app.isPackaged) {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
@@ -115,7 +113,7 @@ app.whenReady().then(async () => {
       widevineOk = true;
       console.log(`[widevine] new Windows CDM disponible (status=${newCdm.status}, version=${newCdm.version}). Ancien composant ignoré.`);
       if (newCdm.status === 'new') {
-        console.log('[widevine] ⚠️  Le CDM a été téléchargé mais ne sera ACTIF qu\'au prochain démarrage de l\'app. Si la lecture échoue avec S6001, fermez et relancez.');
+        console.log('[widevine] ⚠️  CDM téléchargé mais pas encore actif — restart automatique pour le charger.');
       }
     } else {
       const e = err as { message?: string; errors?: Array<{ message?: string; detail?: unknown }> };
@@ -126,6 +124,24 @@ app.whenReady().then(async () => {
       console.warn('[widevine] status complet:', status);
     }
   }
+
+  // Si le CDM vient d'être téléchargé (status 'new'), il ne sera réellement
+  // chargé qu'au prochain démarrage. Pour éviter à l'utilisateur de devoir
+  // fermer et relancer manuellement (ce qui produit S6001 au premier play),
+  // on relance automatiquement l'app — une seule fois, via un flag CLI.
+  const oldCdmStatus = (components.status() as Record<string, { status: string }>)[
+    'oimompecagnajdejgnnjijobebaeigek'
+  ]?.status;
+  const newCdmStatus = (components.status() as Record<string, { status: string }>)[NEW_CDM_ID]?.status;
+  const cdmJustDownloaded = oldCdmStatus === 'new' || newCdmStatus === 'new';
+  const alreadyRestarted = process.argv.includes('--cdm-restart');
+  if (cdmJustDownloaded && !alreadyRestarted) {
+    console.log('[widevine] Restart automatique pour activer le CDM fraîchement téléchargé...');
+    app.relaunch({ args: [...process.argv.slice(1), '--cdm-restart'] });
+    app.exit(0);
+    return;
+  }
+
   if (!widevineOk) {
     console.warn('[widevine] CDM indisponible — Tidal renverra probablement S6001 au play.');
   }

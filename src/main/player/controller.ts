@@ -1,4 +1,4 @@
-import { BrowserWindow, WebContentsView, ipcMain } from 'electron';
+import { app, BrowserWindow, WebContentsView, ipcMain } from 'electron';
 import { TIDAL_WEB_PLAYER_URL } from '../../shared/constants';
 import { store } from '../state/store';
 import type { PlaybackState, Track } from '../../shared/models';
@@ -51,7 +51,7 @@ export function createPlayerView(host: BrowserWindow): WebContentsView {
 
   // En dev, ouvre automatiquement DevTools sur la WebView Tidal pour pouvoir
   // diagnostiquer les erreurs DRM / lecture (S6001, etc.)
-  if (process.env.NODE_ENV !== 'production') {
+  if (!app.isPackaged) {
     view.webContents.once('did-finish-load', () => {
       view?.webContents.openDevTools({ mode: 'detach' });
     });
