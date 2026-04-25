@@ -43,10 +43,12 @@ class AppStore {
       updatedAt: new Date().toISOString(),
     };
 
-    // `now-playing` n'est émis QUE lors d'un changement de piste.
-    // Re-jouer la même piste après une pause ne le déclenche pas.
+    // `now-playing` est émis lors d'un changement de piste OU d'une reprise
+    // après pause (paused → playing), pour que les clients WebSocket qui
+    // rejoignent en cours de lecture reçoivent bien la piste en cours.
     const nextTrackId = this._nowPlaying.track?.id;
-    if (nextTrackId !== previousTrackId) {
+    const isResumingFromPause = next.state === 'playing' && previousState === 'paused';
+    if (nextTrackId !== previousTrackId || isResumingFromPause) {
       eventBus.emitEvent({
         type: 'now-playing',
         timestamp: this._nowPlaying.updatedAt,
