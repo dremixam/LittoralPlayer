@@ -1,20 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import type { ApiServerInfo, AuthStatus, NowPlaying } from '../../shared/models';
+import type { ApiServerInfo, AuthStatus, NowPlaying, PlaybackState, Track } from '../../shared/models';
 
 export function App(): JSX.Element {
   const [apiInfo, setApiInfo] = useState<ApiServerInfo | null>(null);
   const [auth, setAuth] = useState<AuthStatus>({ authenticated: false });
-  const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
+  const [track, setTrack] = useState<Track | undefined>(undefined);
+  const [state, setState] = useState<PlaybackState>('idle');
 
   useEffect(() => {
     void window.tidalApp.getApiInfo().then(setApiInfo);
     void window.tidalApp.getAuthStatus().then(setAuth);
-    void window.tidalApp.getNowPlaying().then(setNowPlaying);
+    void window.tidalApp.getNowPlaying().then((np: NowPlaying | null) => {
+      if (np) { setTrack(np.track); setState(np.state); }
+    });
 
     const off = window.tidalApp.onEvent(event => {
       switch (event.type) {
         case 'now-playing':
-          setNowPlaying(event.payload);
+          setTrack(event.payload.track);
+          break;
+        case 'playback-state':
+          setState(event.payload.state);
           break;
         case 'auth-changed':
           setAuth(event.payload);
@@ -24,8 +30,8 @@ export function App(): JSX.Element {
     return off;
   }, []);
 
-  const trackLabel = nowPlaying?.track
-    ? `${nowPlaying.track.title} — ${nowPlaying.track.artists.map(a => a.name).join(', ')}`
+  const trackLabel = track
+    ? `${track.title} — ${track.artists.map(a => a.name).join(', ')}`
     : '—';
 
   const docsUrl = apiInfo ? `${apiInfo.url}/docs` : null;
@@ -34,7 +40,7 @@ export function App(): JSX.Element {
     <header style={styles.bar}>
       <div style={styles.left}>
         <strong style={styles.brand}>Littoral</strong>
-        <span style={styles.dim}>{nowPlaying?.state ?? 'idle'}</span>
+        <span style={styles.dim}>{state}</span>
         <span style={styles.track}>{trackLabel}</span>
       </div>
       <div style={styles.right}>

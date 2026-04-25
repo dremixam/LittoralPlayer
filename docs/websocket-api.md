@@ -17,10 +17,12 @@ Aucune authentification requise (loopback only).
 ## Cycle de vie
 
 1. À la connexion, le serveur envoie un **snapshot initial** sous forme de 3
-   messages successifs : `now-playing`, `queue-changed`, `auth-changed`. Les
+   messages successifs : `now-playing`, `playback-state`, `auth-changed`. Les
    payloads reflètent l'état courant lu depuis le store Redux du lecteur Tidal
    (avec fallback sur le cache local si la WebView n'est pas encore prête).
-2. Ensuite, tout changement d'état déclenche un message du type approprié.
+2. Ensuite, chaque message n'est émis **que lorsque sa valeur change** :
+   `now-playing` uniquement au changement de piste, `playback-state` uniquement
+   au changement d'état (play ↔ pause).
 3. Un `ping` WebSocket est envoyé toutes les 30 s pour maintenir la connexion.
    Le client doit y répondre par un `pong` (la plupart des libs le font
    automatiquement).
@@ -39,14 +41,16 @@ Tous les messages sont du JSON UTF-8 avec la forme :
 
 ### `now-playing`
 
-Émis à chaque changement de morceau, d'état (play/pause), ou de volume.
+Émis **uniquement lors d'un changement de piste** (identifiant Tidal différent).
+Re-jouer la même piste après une pause **ne déclenche pas** cet événement.
+Le payload contient les infos de la nouvelle piste ; l'état play/pause est
+dans `playback-state`.
 
 ```json
 {
   "type": "now-playing",
   "timestamp": "2025-01-20T14:32:11.123Z",
   "payload": {
-    "state": "playing",                 // 'idle' | 'playing' | 'paused'
     "track": {
       "id": "12345678",                 // identifiant Tidal numérique (string)
       "title": "Title",
@@ -54,38 +58,21 @@ Tous les messages sont du JSON UTF-8 avec la forme :
       "album": { "id": "555", "title": "Album", "coverUrl": "https://..." },
       "coverUrl": "https://...",
       "durationSeconds": 213
-    },
-    "positionSeconds": 42.5,
-    "durationSeconds": 213,
-    "volume": 80,                       // 0..100
-    "updatedAt": "2025-01-20T14:32:11.123Z"
+    }
   }
 }
 ```
 
 ### `playback-state`
 
-Émis quand l'état de lecture change (sans changement de morceau).
+Émis **uniquement lors d'un changement d'état** (play ↔ pause). Ne se
+déclenche pas si la piste change sans changement d'état.
 
 ```json
 {
   "type": "playback-state",
   "timestamp": "2025-01-20T14:32:11.123Z",
-  "payload": { "state": "paused" }
-}
-```
-
-### `track-changed`
-
-Émis quand le morceau courant change (nouvelle piste, ou arrêt complet).
-
-```json
-{
-  "type": "track-changed",
-  "timestamp": "2025-01-20T14:32:11.123Z",
-  "payload": {
-    "track": { /* idem now-playing.track, ou absent si plus rien ne joue */ }
-  }
+  "payload": { "state": "paused" }     // 'idle' | 'playing' | 'paused'
 }
 ```
 
@@ -98,30 +85,6 @@ Tous les messages sont du JSON UTF-8 avec la forme :
   "type": "position",
   "timestamp": "2025-01-20T14:32:11.123Z",
   "payload": { "positionSeconds": 42.5, "durationSeconds": 213 }
-}
-```
-
-### `queue-changed`
-
-Émis chaque fois que la file d'attente Tidal change (ajout via
-`/queue/enqueue`, drag&drop dans l'UI Tidal, lecture du morceau suivant qui
-fait avancer le `currentIndex`, etc.). Les `items` listés sont les morceaux
-**à venir** (le morceau en cours de lecture est exposé via `now-playing`).
-
-```json
-{
-  "type": "queue-changed",
-  "timestamp": "2025-01-20T14:32:11.123Z",
-  "payload": {
-    "items": [
-      {
-        "id": "<uid Tidal>",
-        "trackId": "12345678",
-        "addedAt": "",
-        "track": { /* mêmes champs que now-playing.track */ }
-      }
-    ]
-  }
 }
 ```
 
@@ -152,13 +115,16 @@ ws.addEventListener('message', (evt) => {
   const msg = JSON.parse(evt.data);
   switch (msg.type) {
     case 'now-playing':
-      console.log('►', msg.payload.track?.title, msg.payload.state);
+      console.log('Nouvelle piste :', msg.payload.track?.title);
+      break;
+    case 'playback-state':
+      console.log('État :', msg.payload.state); // 'playing' | 'paused' | 'idle'
       break;
     case 'position':
       // mise à jour barre de progression
       break;
-    case 'queue-changed':
-      console.log('Queue:', msg.payload.items.length, 'item(s)');
+    case 'auth-changed':
+      console.log('Auth :', msg.payload.authenticated);
       break;
   }
 });
@@ -169,5 +135,7 @@ ws.addEventListener('message', (evt) => {
 - Le canal n'envoie pas l'historique : les événements survenus avant la
   connexion ne sont pas rejoués (sauf le snapshot initial).
 - En cas de déconnexion, reconnecter et le snapshot initial vous resynchronise.
+- La file d'attente n'est pas diffusée par WebSocket ; consultez `GET /queue`
+  pour la lire à la demande.
 - Le bridge interne se reconnecte automatiquement au store Redux Tidal après
   navigation/rechargement de la WebView ; l'API WebSocket reste stable.

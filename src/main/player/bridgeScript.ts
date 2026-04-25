@@ -483,39 +483,9 @@ export const PLAYER_BRIDGE_SCRIPT = String.raw`
     },
   };
 
-  // --- Subscription Redux : pousse les changements de file d'attente Tidal
-  //     vers le main process pour alimenter les events WebSocket. ---
-  let lastQueueSig = '';
-  const subscribeRedux = () => {
-    const store = findReduxStore();
-    if (!store) return false;
-    try {
-      store.subscribe(() => {
-        try {
-          const s = store.getState();
-          const elements = (s.playQueue && s.playQueue.elements) || [];
-          const currentIndex = (s.playQueue && typeof s.playQueue.currentIndex === 'number')
-            ? s.playQueue.currentIndex : -1;
-          const upcoming = elements.slice(currentIndex + 1);
-          // Signature compacte : nb d'items + uids concaténés.
-          const sig = upcoming.length + ':' + upcoming.map(e => e.uid).join(',');
-          if (sig !== lastQueueSig) {
-            lastQueueSig = sig;
-            post({ kind: 'queue', data: queueFromRedux() });
-          }
-        } catch (e) { /* ignore */ }
-      });
-      return true;
-    } catch (e) { return false; }
-  };
-  // Réessaye régulièrement tant que le store n'est pas trouvé (Tidal SPA peut
-  // mettre quelques secondes à monter).
-  let reduxSubAttempts = 0;
-  const trySubscribe = () => {
-    if (subscribeRedux()) return;
-    if (reduxSubAttempts++ < 30) setTimeout(trySubscribe, 1000);
-  };
-  trySubscribe();
+  // --- Subscription Redux : désactivée. Les events WebSocket sont alimentés
+  //     par un polling côté main qui appelle getNowPlaying() périodiquement.
+  //     La file d'attente est lue à la demande via REST GET /queue. ---
 
   // Premier ping
   setTimeout(sendSnapshot, 1000);

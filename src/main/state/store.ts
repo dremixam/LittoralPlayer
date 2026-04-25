@@ -43,22 +43,20 @@ class AppStore {
       updatedAt: new Date().toISOString(),
     };
 
-    eventBus.emitEvent({
-      type: 'now-playing',
-      timestamp: this._nowPlaying.updatedAt,
-      payload: this._nowPlaying,
-    });
-
-    if (next.state && next.state !== previousState) {
-      this.emitPlaybackState(next.state);
-    }
+    // `now-playing` n'est émis QUE lors d'un changement de piste.
+    // Re-jouer la même piste après une pause ne le déclenche pas.
     const nextTrackId = this._nowPlaying.track?.id;
     if (nextTrackId !== previousTrackId) {
       eventBus.emitEvent({
-        type: 'track-changed',
-        timestamp: new Date().toISOString(),
+        type: 'now-playing',
+        timestamp: this._nowPlaying.updatedAt,
         payload: { track: this._nowPlaying.track },
       });
+    }
+
+    // `playback-state` n'est émis QUE lors d'un changement d'état.
+    if (next.state && next.state !== previousState) {
+      this.emitPlaybackState(next.state);
     }
   }
 
@@ -85,16 +83,11 @@ class AppStore {
   }
 
   /**
-   * Met à jour le miroir local de la file d'attente Tidal (alimenté par le bridge
-   * via une subscription Redux). Émet `queue-changed` pour les clients WebSocket.
+   * Met à jour le miroir local de la file d'attente Tidal. Aucune émission
+   * d'événement WebSocket : la queue est consultable via REST `GET /queue`.
    */
   setQueue(next: Queue): void {
     this._queue = next;
-    eventBus.emitEvent({
-      type: 'queue-changed',
-      timestamp: new Date().toISOString(),
-      payload: this._queue,
-    });
   }
 
   setAuth(next: AuthStatus): void {

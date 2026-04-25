@@ -61,11 +61,12 @@ export interface AuthStatus {
 }
 
 export type AppEvent =
-  | { type: 'now-playing'; timestamp: string; payload: NowPlaying }
+  // Émis uniquement lors d'un changement de piste (track.id différent).
+  // Le payload contient les infos de la nouvelle piste — pas de state ici.
+  | { type: 'now-playing'; timestamp: string; payload: { track?: Track } }
+  // Émis uniquement lors d'un changement d'état du playback (play <-> pause).
   | { type: 'playback-state'; timestamp: string; payload: { state: PlaybackState } }
-  | { type: 'track-changed'; timestamp: string; payload: { track?: Track } }
   | { type: 'position'; timestamp: string; payload: { positionSeconds: number; durationSeconds?: number } }
-  | { type: 'queue-changed'; timestamp: string; payload: Queue }
   | { type: 'auth-changed'; timestamp: string; payload: AuthStatus };
 
 export type AppEventType = AppEvent['type'];

@@ -13,21 +13,17 @@ export function attachWebSocket(httpServer: Server): WebSocketServer {
 
   const sendInitialSnapshot = async (ws: WebSocket) => {
     const now = new Date().toISOString();
-    // now-playing : prefer live Tidal Redux read, fallback cache.
-    let nowPlaying: unknown = store.nowPlaying;
+    // À la connexion, on envoie l'état courant : la piste actuelle (now-playing)
+    // et l'état du playback (playback-state). Par la suite ces events ne seront
+    // émis que lors d'un vrai changement.
+    let track = store.nowPlaying.track;
+    let state = store.nowPlaying.state;
     try {
       const np = await playerControl.getNowPlayingFromTidal();
-      if (np) nowPlaying = { ...np, updatedAt: now };
+      if (np) { track = np.track; state = np.state; }
     } catch { /* ignore */ }
-    safeSend(ws, { type: 'now-playing', timestamp: now, payload: nowPlaying });
-
-    // queue : same approach
-    let queue: unknown = store.queue;
-    try {
-      const q = await playerControl.getQueueFromTidal();
-      if (q) queue = q;
-    } catch { /* ignore */ }
-    safeSend(ws, { type: 'queue-changed', timestamp: now, payload: queue });
+    safeSend(ws, { type: 'now-playing', timestamp: now, payload: { track } });
+    safeSend(ws, { type: 'playback-state', timestamp: now, payload: { state } });
 
     safeSend(ws, { type: 'auth-changed', timestamp: now, payload: store.auth });
   };

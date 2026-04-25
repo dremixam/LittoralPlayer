@@ -61,6 +61,7 @@ export function createPlayerView(host: BrowserWindow): WebContentsView {
     void installBridge();
     // Démarre / rafraîchit le watcher de token dès qu'une page se charge
     if (view) startTokenWatcher(view);
+    startStatePolling();
   });
   view.webContents.on('did-navigate-in-page', () => {
     void installBridge();
@@ -248,5 +249,34 @@ export function getPlayerView(): WebContentsView | null {
 
 export function disposePlayerView(): void {
   stopTokenWatcher();
+  stopStatePolling();
   view = null;
+}
+
+// --- Polling périodique de l'état Tidal ---
+// Le bridge Redux ne notifie pas de manière fiable les changements de track et
+// d'état play/pause. Plutôt que de reverse-engineer le store, on poll
+// `getNowPlayingFromTidal()` toutes les secondes et on émet :
+//   - `now-playing` uniquement quand `track.id` change
+//   - `playback-state` uniquement quand `state` change
+// (la déduplication est faite par `store.setNowPlaying`).
+let pollTimer: NodeJS.Timeout | null = null;
+
+function startStatePolling(): void {
+  if (pollTimer) return;
+  pollTimer = setInterval(() => { void pollOnce(); }, 1000);
+}
+
+function stopStatePolling(): void {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+async function pollOnce(): Promise<void> {
+  try {
+    const np = await playerControl.getNowPlayingFromTidal();
+    if (np) {
+      store.setNowPlaying({ state: np.state, track: np.track });
+    }
+  } catch { /* view may not be ready */ }
 }
