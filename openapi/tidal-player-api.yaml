@@ -1,0 +1,477 @@
+openapi: 3.1.0
+info:
+  title: Littoral - Local API
+  version: 0.1.0
+  description: |
+    API locale exposée par Littoral (lecteur Tidal Electron).
+
+    - REST pour interroger l'état, contrôler la lecture, rechercher dans le catalogue, gérer la file d'attente.
+    - WebSocket sur `/events` pour être notifié en temps réel des changements de playback (play, pause, changement de morceau, position, file d'attente, etc.).
+servers:
+  - url: http://127.0.0.1:7143
+    description: Instance locale (port par défaut, configurable)
+
+tags:
+  - name: status
+  - name: playback
+  - name: queue
+  - name: catalogue
+  - name: auth
+
+paths:
+  /health:
+    get:
+      tags: [status]
+      operationId: getHealth
+      summary: Sonde de santé
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /now-playing:
+    get:
+      tags: [playback]
+      operationId: getNowPlaying
+      summary: Morceau en cours et état du lecteur
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NowPlaying'
+
+  /playback/play:
+    post:
+      tags: [playback]
+      operationId: play
+      summary: Reprendre / démarrer la lecture
+      responses:
+        '204': { description: OK }
+
+  /playback/pause:
+    post:
+      tags: [playback]
+      operationId: pause
+      summary: Mettre en pause
+      responses:
+        '204': { description: OK }
+
+  /playback/toggle:
+    post:
+      tags: [playback]
+      operationId: togglePlayPause
+      summary: Bascule play/pause
+      responses:
+        '204': { description: OK }
+
+  /playback/next:
+    post:
+      tags: [playback]
+      operationId: next
+      summary: Morceau suivant
+      responses:
+        '204': { description: OK }
+
+  /playback/previous:
+    post:
+      tags: [playback]
+      operationId: previous
+      summary: Morceau précédent
+      responses:
+        '204': { description: OK }
+
+  /playback/seek:
+    post:
+      tags: [playback]
+      operationId: seek
+      summary: Aller à une position (en secondes)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [positionSeconds]
+              properties:
+                positionSeconds:
+                  type: number
+                  minimum: 0
+      responses:
+        '204': { description: OK }
+
+  /playback/volume:
+    post:
+      tags: [playback]
+      operationId: setVolume
+      summary: Régler le volume (0..100)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [volume]
+              properties:
+                volume:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+      responses:
+        '204': { description: OK }
+
+  /queue:
+    get:
+      tags: [queue]
+      operationId: getQueue
+      summary: Récupérer la file d'attente Tidal (morceaux à venir)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Queue'
+
+  /queue/enqueue:
+    post:
+      tags: [queue]
+      operationId: enqueueTrack
+      summary: Ajouter un morceau à la file d'attente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [trackId]
+              properties:
+                trackId:
+                  type: string
+                  description: Identifiant Tidal du morceau
+                position:
+                  type: string
+                  enum: [end, next]
+                  default: end
+      responses:
+        '200':
+          description: Élément ajouté
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Queue'
+
+  /catalogue/search:
+    get:
+      tags: [catalogue]
+      operationId: search
+      summary: Rechercher dans le catalogue Tidal
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string, minLength: 1 }
+        - in: query
+          name: types
+          schema:
+            type: string
+            description: Types séparés par virgule (tracks,albums,artists,playlists)
+            default: tracks,albums,artists,playlists
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResults'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /catalogue/tracks/{trackId}:
+    get:
+      tags: [catalogue]
+      operationId: getTrack
+      parameters:
+        - in: path
+          name: trackId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Track' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /auth/status:
+    get:
+      tags: [auth]
+      operationId: getAuthStatus
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthStatus' }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: startLogin
+      summary: Affiche la page de login Tidal dans la WebView (single login ; le token est ensuite extrait du localStorage)
+      responses:
+        '202':
+          description: WebView dirigée vers la page de login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorizationUrl: { type: string }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Vide le localStorage / cookies de la WebView et la renvoie sur la page de login
+      responses:
+        '204': { description: OK }
+
+components:
+  responses:
+    Unauthorized:
+      description: Pas authentifié auprès de Tidal
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Health:
+      type: object
+      required: [status, version]
+      properties:
+        status: { type: string, enum: [ok] }
+        version: { type: string }
+        uptimeSeconds: { type: number }
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+    PlaybackState:
+      type: string
+      enum: [idle, playing, paused, buffering]
+
+    Track:
+      type: object
+      required: [id, title, artists, durationSeconds]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        artists:
+          type: array
+          items: { $ref: '#/components/schemas/Artist' }
+        album: { $ref: '#/components/schemas/AlbumRef' }
+        durationSeconds: { type: number }
+        isrc: { type: string }
+        explicit: { type: boolean }
+        coverUrl: { type: string, format: uri }
+        url: { type: string, format: uri, description: URL Tidal }
+
+    Artist:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        pictureUrl: { type: string, format: uri }
+
+    AlbumRef:
+      type: object
+      required: [id, title]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        coverUrl: { type: string, format: uri }
+
+    Album:
+      allOf:
+        - $ref: '#/components/schemas/AlbumRef'
+        - type: object
+          properties:
+            artists:
+              type: array
+              items: { $ref: '#/components/schemas/Artist' }
+            releaseDate: { type: string, format: date }
+            numberOfTracks: { type: integer }
+
+    Playlist:
+      type: object
+      required: [id, title]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        coverUrl: { type: string, format: uri }
+        numberOfTracks: { type: integer }
+
+    NowPlaying:
+      type: object
+      required: [state]
+      properties:
+        state: { $ref: '#/components/schemas/PlaybackState' }
+        track: { $ref: '#/components/schemas/Track' }
+        positionSeconds: { type: number }
+        durationSeconds: { type: number }
+        volume: { type: integer, minimum: 0, maximum: 100 }
+        shuffle: { type: boolean }
+        repeat: { type: string, enum: [off, one, all] }
+        updatedAt: { type: string, format: date-time }
+
+    QueueItem:
+      type: object
+      required: [id, trackId, addedAt]
+      properties:
+        id: { type: string, description: Identifiant local de l'élément de file }
+        trackId: { type: string }
+        addedAt: { type: string, format: date-time }
+        track: { $ref: '#/components/schemas/Track' }
+
+    Queue:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/QueueItem' }
+
+    SearchResults:
+      type: object
+      properties:
+        tracks:
+          type: array
+          items: { $ref: '#/components/schemas/Track' }
+        albums:
+          type: array
+          items: { $ref: '#/components/schemas/Album' }
+        artists:
+          type: array
+          items: { $ref: '#/components/schemas/Artist' }
+        playlists:
+          type: array
+          items: { $ref: '#/components/schemas/Playlist' }
+
+    AuthStatus:
+      type: object
+      required: [authenticated]
+      properties:
+        authenticated: { type: boolean }
+        scopes:
+          type: array
+          items: { type: string }
+        expiresAt: { type: string, format: date-time }
+        userId: { type: string }
+        countryCode: { type: string }
+
+    Event:
+      oneOf:
+        - $ref: '#/components/schemas/EventNowPlaying'
+        - $ref: '#/components/schemas/EventPlaybackState'
+        - $ref: '#/components/schemas/EventTrackChanged'
+        - $ref: '#/components/schemas/EventPosition'
+        - $ref: '#/components/schemas/EventQueueChanged'
+        - $ref: '#/components/schemas/EventAuthChanged'
+      discriminator:
+        propertyName: type
+
+    EventBase:
+      type: object
+      required: [type, timestamp]
+      properties:
+        type: { type: string }
+        timestamp: { type: string, format: date-time }
+
+    EventNowPlaying:
+      allOf:
+        - $ref: '#/components/schemas/EventBase'
+        - type: object
+          required: [type, payload]
+          properties:
+            type: { const: now-playing }
+            payload: { $ref: '#/components/schemas/NowPlaying' }
+
+    EventPlaybackState:
+      allOf:
+        - $ref: '#/components/schemas/EventBase'
+        - type: object
+          required: [type, payload]
+          properties:
+            type: { const: playback-state }
+            payload:
+              type: object
+              required: [state]
+              properties:
+                state: { $ref: '#/components/schemas/PlaybackState' }
+
+    EventTrackChanged:
+      allOf:
+        - $ref: '#/components/schemas/EventBase'
+        - type: object
+          required: [type, payload]
+          properties:
+            type: { const: track-changed }
+            payload:
+              type: object
+              properties:
+                track: { $ref: '#/components/schemas/Track' }
+
+    EventPosition:
+      allOf:
+        - $ref: '#/components/schemas/EventBase'
+        - type: object
+          required: [type, payload]
+          properties:
+            type: { const: position }
+            payload:
+              type: object
+              required: [positionSeconds]
+              properties:
+                positionSeconds: { type: number }
+                durationSeconds: { type: number }
+
+    EventQueueChanged:
+      allOf:
+        - $ref: '#/components/schemas/EventBase'
+        - type: object
+          required: [type, payload]
+          properties:
+            type: { const: queue-changed }
+            payload: { $ref: '#/components/schemas/Queue' }
+
+    EventAuthChanged:
+      allOf:
+        - $ref: '#/components/schemas/EventBase'
+        - type: object
+          required: [type, payload]
+          properties:
+            type: { const: auth-changed }
+            payload: { $ref: '#/components/schemas/AuthStatus' }

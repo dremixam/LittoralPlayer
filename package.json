@@ -1,0 +1,79 @@
+{
+  "name": "littoral",
+  "version": "0.1.0",
+  "description": "Littoral — lecteur Tidal Electron exposant une API locale (REST + WebSocket) documentée via OpenAPI.",
+  "main": "out/main/index.js",
+  "author": "Maxime",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && npm run openapi:types && electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "openapi:types": "openapi-typescript openapi/tidal-player-api.yaml -o src/shared/api-types.ts",
+    "openapi:lint": "redocly lint openapi/tidal-player-api.yaml",
+    "package": "npm run build && electron-builder",
+    "package:dir": "npm run build && electron-builder --dir",
+    "postinstall": "py -3 -m castlabs_evs.vmp sign-pkg node_modules/electron/dist || python -m castlabs_evs.vmp sign-pkg node_modules/electron/dist"
+  },
+  "dependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/swagger-ui-express": "^4.1.8",
+    "electron-store": "^8.2.0",
+    "express": "^4.21.2",
+    "js-yaml": "^4.1.1",
+    "openapi-backend": "^5.11.1",
+    "swagger-ui-express": "^5.0.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/ws": "^8.5.13",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "github:castlabs/electron-releases#v41.1.1+wvcus",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "openapi-typescript": "^7.4.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11"
+  },
+  "build": {
+    "appId": "com.maxime.littoral",
+    "productName": "Littoral",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "openapi",
+        "to": "openapi"
+      },
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "resources/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "resources/icon.png"
+    }
+  }
+}

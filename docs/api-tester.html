@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Littoral — API tester</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; gap: 16px;
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #0b0d10; color: #e6e6e6;
+    display: grid; grid-template-columns: 360px 1fr; min-height: 100vh;
+  }
+  h1 { margin: 0 0 8px; font-size: 16px; letter-spacing: .5px; }
+  h2 { margin: 16px 0 4px; font-size: 12px; text-transform: uppercase; color: #888; letter-spacing: 1px; }
+  .col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .card { background: #14181d; border: 1px solid #232a32; border-radius: 6px; padding: 10px; }
+  label { font-size: 12px; color: #aaa; }
+  input, select, button, textarea {
+    font: inherit; padding: 6px 8px; border-radius: 4px;
+    border: 1px solid #2a313a; background: #0f1216; color: #e6e6e6;
+  }
+  button { cursor: pointer; background: #1f2730; }
+  button:hover { background: #2a3340; }
+  button.primary { background: #1d4ed8; border-color: #1e40af; }
+  button.danger { background: #7f1d1d; border-color: #991b1b; }
+  .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .row > * { flex: 0 0 auto; }
+  .row .grow { flex: 1 1 auto; min-width: 120px; }
+  pre {
+    margin: 0; padding: 10px; background: #0f1216; border: 1px solid #232a32;
+    border-radius: 4px; max-height: 40vh; overflow: auto; white-space: pre-wrap;
+    word-break: break-word; font: 12px/1.4 ui-monospace, Consolas, monospace;
+  }
+  .log { display: flex; flex-direction: column; gap: 6px; }
+  .log .entry { border-left: 3px solid #2a313a; padding-left: 8px; }
+  .log .entry.ok { border-color: #16a34a; }
+  .log .entry.err { border-color: #dc2626; }
+  .log .meta { font-size: 11px; color: #888; }
+  .pill { display: inline-block; padding: 1px 6px; border-radius: 999px; font-size: 11px; background: #2a313a; }
+  .ws-state.connected { background: #14532d; color: #bbf7d0; }
+  .ws-state.disconnected { background: #7f1d1d; color: #fecaca; }
+  .ws-state.connecting { background: #713f12; color: #fde68a; }
+  .results { display: flex; flex-direction: column; gap: 4px; }
+  .results .item {
+    display: flex; gap: 8px; align-items: center; padding: 4px 6px; border-radius: 4px;
+  }
+  .results .item:hover { background: #1a2028; }
+  .results .item img { width: 32px; height: 32px; border-radius: 2px; object-fit: cover; background: #222; }
+  .results .item .meta { display: flex; flex-direction: column; min-width: 0; }
+  .results .item .title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .results .item .sub { font-size: 11px; color: #888; }
+  .results .item button { margin-left: auto; }
+  details > summary { cursor: pointer; user-select: none; padding: 4px 0; }
+</style>
+</head>
+<body>
+
+<aside class="col">
+  <h1>Littoral · API tester</h1>
+
+  <div class="card">
+    <h2>Connexion</h2>
+    <label for="base">Base URL</label>
+    <input id="base" value="http://127.0.0.1:7143" />
+    <div class="row">
+      <button id="ping">Ping /health</button>
+      <button id="ws-toggle">Connect WS</button>
+      <span id="ws-state" class="pill ws-state disconnected">disconnected</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Auth</h2>
+    <div class="row">
+      <button data-call="GET /auth/status">/auth/status</button>
+      <button data-call="POST /auth/login">/auth/login</button>
+      <button class="danger" data-call="POST /auth/logout">/auth/logout</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Lecture</h2>
+    <div class="row">
+      <button data-call="GET /now-playing">/now-playing</button>
+      <button data-call="POST /playback/play">▶ play</button>
+      <button data-call="POST /playback/pause">⏸ pause</button>
+      <button data-call="POST /playback/toggle">⏯ toggle</button>
+      <button data-call="POST /playback/previous">⏮ prev</button>
+      <button data-call="POST /playback/next">⏭ next</button>
+    </div>
+    <div class="row">
+      <label class="grow">seek (s) <input id="seek" type="number" value="30" min="0" /></label>
+      <button id="do-seek">Go</button>
+    </div>
+    <div class="row">
+      <label class="grow">volume <input id="vol" type="range" min="0" max="100" value="50" /></label>
+      <span id="vol-val">50</span>
+      <button id="do-vol">Set</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>File d'attente</h2>
+    <div class="row">
+      <button data-call="GET /queue">GET /queue</button>
+    </div>
+    <div class="row">
+      <input id="enq-id" placeholder="trackId" class="grow" />
+      <select id="enq-pos"><option>end</option><option>next</option></select>
+      <button id="enq-btn" class="primary">Enqueue</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Catalogue</h2>
+    <div class="row">
+      <input id="q" placeholder="recherche…" class="grow" />
+      <select id="q-types">
+        <option value="tracks">tracks</option>
+        <option value="albums">albums</option>
+        <option value="artists">artists</option>
+        <option value="playlists">playlists</option>
+        <option value="tracks,albums,artists,playlists">all</option>
+      </select>
+      <button id="q-btn">Search</button>
+    </div>
+    <div class="row">
+      <input id="track-id" placeholder="trackId" class="grow" />
+      <button id="track-btn">GET /catalogue/tracks/:id</button>
+    </div>
+    <div id="results" class="results"></div>
+  </div>
+</aside>
+
+<main class="col">
+  <div class="card">
+    <h2>Now playing</h2>
+    <pre id="np">—</pre>
+  </div>
+
+  <div class="card">
+    <h2>File d'attente Tidal</h2>
+    <pre id="queue">—</pre>
+  </div>
+
+  <div class="card">
+    <h2>WebSocket events</h2>
+    <div class="row">
+      <button id="ws-clear">Clear</button>
+      <label><input type="checkbox" id="ws-no-pos" /> masquer "position"</label>
+    </div>
+    <div id="ws-log" class="log"></div>
+  </div>
+
+  <details class="card">
+    <summary><strong>Console HTTP</strong> (dernières requêtes REST)</summary>
+    <div id="http-log" class="log"></div>
+  </details>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const baseEl = $('base');
+
+async function call(method, path, body) {
+  const url = baseEl.value.replace(/\/$/, '') + path;
+  const opts = { method, headers: {} };
+  if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const t0 = performance.now();
+  let res, text, json, ok = false;
+  try {
+    res = await fetch(url, opts);
+    text = await res.text();
+    try { json = text ? JSON.parse(text) : null; } catch { json = text; }
+    ok = res.ok;
+  } catch (e) {
+    text = String(e); ok = false;
+  }
+  const dt = Math.round(performance.now() - t0);
+  logHttp({ method, path, status: res ? res.status : 'ERR', ok, dt, body: json ?? text });
+  // routes spéciales : push dans les panneaux dédiés
+  if (path === '/now-playing' && ok) $('np').textContent = JSON.stringify(json, null, 2);
+  if (path === '/queue' && ok) $('queue').textContent = JSON.stringify(json, null, 2);
+  return { ok, status: res ? res.status : 0, body: json };
+}
+
+function logHttp({ method, path, status, ok, dt, body }) {
+  const entry = document.createElement('div');
+  entry.className = 'entry ' + (ok ? 'ok' : 'err');
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.textContent = method + ' ' + path + ' → ' + status + ' · ' + dt + ' ms';
+  const pre = document.createElement('pre');
+  pre.textContent = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
+  entry.appendChild(meta); entry.appendChild(pre);
+  const log = $('http-log');
+  log.prepend(entry);
+  while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+// --- Ping & generic action buttons ---
+$('ping').onclick = () => call('GET', '/health');
+document.querySelectorAll('button[data-call]').forEach(btn => {
+  btn.onclick = () => {
+    const [method, path] = btn.dataset.call.split(' ');
+    call(method, path);
+  };
+});
+
+// --- Seek / volume ---
+$('do-seek').onclick = () => call('POST', '/playback/seek', { positionSeconds: Number($('seek').value) });
+$('vol').oninput = (e) => { $('vol-val').textContent = e.target.value; };
+$('do-vol').onclick = () => call('POST', '/playback/volume', { volume: Number($('vol').value) });
+
+// --- Enqueue ---
+$('enq-btn').onclick = () => {
+  const trackId = $('enq-id').value.trim();
+  if (!trackId) return;
+  call('POST', '/queue/enqueue', { trackId, position: $('enq-pos').value });
+};
+
+// --- Search ---
+$('q-btn').onclick = async () => {
+  const q = $('q').value.trim();
+  if (!q) return;
+  const types = $('q-types').value;
+  const r = await call('GET', '/catalogue/search?q=' + encodeURIComponent(q) + '&types=' + types + '&limit=20');
+  if (r.ok) renderResults(r.body);
+};
+$('q').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('q-btn').click(); });
+
+$('track-btn').onclick = () => {
+  const id = $('track-id').value.trim();
+  if (id) call('GET', '/catalogue/tracks/' + encodeURIComponent(id));
+};
+
+function renderResults(data) {
+  const wrap = $('results');
+  wrap.innerHTML = '';
+  if (!data || typeof data !== 'object') return;
+  const sections = [
+    { key: 'tracks', label: 'Tracks' },
+    { key: 'albums', label: 'Albums' },
+    { key: 'artists', label: 'Artists' },
+    { key: 'playlists', label: 'Playlists' },
+  ];
+  for (const sec of sections) {
+    const items = data[sec.key];
+    if (!Array.isArray(items) || !items.length) continue;
+    const h = document.createElement('div');
+    h.style.cssText = 'font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-top:6px;';
+    h.textContent = sec.label;
+    wrap.appendChild(h);
+    for (const it of items) {
+      const row = document.createElement('div');
+      row.className = 'item';
+      const cover = it.coverUrl || (it.album && it.album.coverUrl) || '';
+      row.innerHTML = `
+        <img src="${cover || ''}" alt="" onerror="this.style.visibility='hidden'" />
+        <div class="meta">
+          <div class="title"></div>
+          <div class="sub"></div>
+        </div>
+      `;
+      row.querySelector('.title').textContent = it.title || it.name || it.id;
+      const sub = [];
+      if (it.artists) sub.push(it.artists.map(a => a.name).join(', '));
+      if (it.album) sub.push(it.album.title);
+      sub.push('id: ' + it.id);
+      row.querySelector('.sub').textContent = sub.filter(Boolean).join(' · ');
+      if (sec.key === 'tracks') {
+        const btn = document.createElement('button');
+        btn.textContent = '+ queue';
+        btn.onclick = () => call('POST', '/queue/enqueue', { trackId: String(it.id), position: 'end' });
+        row.appendChild(btn);
+      }
+      wrap.appendChild(row);
+    }
+  }
+}
+
+// --- WebSocket ---
+let ws = null;
+function setWsState(state) {
+  const el = $('ws-state');
+  el.textContent = state;
+  el.className = 'pill ws-state ' + state;
+  $('ws-toggle').textContent = state === 'connected' ? 'Disconnect WS' : 'Connect WS';
+}
+$('ws-toggle').onclick = () => {
+  if (ws && ws.readyState <= 1) { ws.close(); return; }
+  const url = baseEl.value.replace(/^http/, 'ws').replace(/\/$/, '') + '/events';
+  setWsState('connecting');
+  ws = new WebSocket(url);
+  ws.onopen = () => setWsState('connected');
+  ws.onclose = () => { setWsState('disconnected'); ws = null; };
+  ws.onerror = () => setWsState('disconnected');
+  ws.onmessage = (e) => {
+    let msg; try { msg = JSON.parse(e.data); } catch { msg = e.data; }
+    if (msg && msg.type === 'now-playing') $('np').textContent = JSON.stringify(msg.payload, null, 2);
+    if (msg && msg.type === 'queue-changed') $('queue').textContent = JSON.stringify(msg.payload, null, 2);
+    if (msg && msg.type === 'position' && $('ws-no-pos').checked) return;
+    const entry = document.createElement('div');
+    entry.className = 'entry ok';
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = (msg && msg.type) || 'message';
+    const pre = document.createElement('pre');
+    pre.textContent = JSON.stringify(msg, null, 2);
+    entry.appendChild(meta); entry.appendChild(pre);
+    const log = $('ws-log');
+    log.prepend(entry);
+    while (log.children.length > 50) log.removeChild(log.lastChild);
+  };
+};
+$('ws-clear').onclick = () => { $('ws-log').innerHTML = ''; };
+
+// Auto-ping au chargement
+call('GET', '/health');
+</script>
+</body>
+</html>

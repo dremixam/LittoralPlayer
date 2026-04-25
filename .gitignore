@@ -1,0 +1,9 @@
+node_modules/
+out/
+release/
+.vite/
+*.log
+.DS_Store
+.env
+.env.local
+src/shared/api-types.ts
