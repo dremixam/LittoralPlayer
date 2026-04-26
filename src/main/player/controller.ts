@@ -274,7 +274,12 @@ function stopStatePolling(): void {
 
 async function pollOnce(): Promise<void> {
   try {
-    const np = await playerControl.getNowPlayingFromTidal();
+    // Fallback vers snapshot() (mediaSession) si Redux n'a pas encore hydraté
+    // playbackControls — cas typique d'une lecture lancée via le bouton "Aléatoire".
+    const np = (await playerControl.getNowPlayingFromTidal())
+      ?? (await exec<{ state: PlaybackState; track?: Track } | null>(
+          'window.__tidalControl && window.__tidalControl.snapshot()',
+        ));
     if (np) {
       store.setNowPlaying({ state: np.state, track: np.track });
     }

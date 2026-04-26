@@ -135,11 +135,17 @@ app.whenReady().then(async () => {
   const newCdmStatus = (components.status() as Record<string, { status: string }>)[NEW_CDM_ID]?.status;
   const cdmJustDownloaded = oldCdmStatus === 'new' || newCdmStatus === 'new';
   const alreadyRestarted = process.argv.includes('--cdm-restart');
-  if (cdmJustDownloaded && !alreadyRestarted) {
+  // En mode dev, electron-vite gère le process Electron : un app.relaunch() tuerait
+  // le serveur Vite et la fenêtre relancée n'aurait plus de renderer (écran noir).
+  // On laisse donc le CDM s'activer au prochain démarrage manuel en dev.
+  if (cdmJustDownloaded && !alreadyRestarted && app.isPackaged) {
     console.log('[widevine] Restart automatique pour activer le CDM fraîchement téléchargé...');
     app.relaunch({ args: [...process.argv.slice(1), '--cdm-restart'] });
     app.exit(0);
     return;
+  }
+  if (cdmJustDownloaded && !app.isPackaged) {
+    console.log('[widevine] CDM téléchargé (status=new) — sera actif au prochain démarrage. Pas de restart en mode dev.');
   }
 
   if (!widevineOk) {

@@ -203,6 +203,10 @@ export const PLAYER_BRIDGE_SCRIPT = String.raw`
     let state = 'idle';
     if (pc.desiredPlaybackState === 'PLAYING') state = 'playing';
     else if (track) state = 'paused';
+    // Si Redux n'a ni piste ni état de lecture actif (ex: lecture lancée via
+    // "Aléatoire" avant que playbackControls soit hydraté), retourner null
+    // pour laisser snapshot() (mediaSession) prendre le relais.
+    if (!track && state === 'idle') return null;
     const media = findMediaElement();
     const positionSeconds = (typeof pc.latestCurrentTime === 'number')
       ? pc.latestCurrentTime
