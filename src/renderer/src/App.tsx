@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import iconSrc from './icon.svg';
 import type { ApiServerInfo, AuthStatus, NowPlaying, PlaybackState, Track } from '../../shared/models';
 
 export function App(): JSX.Element {
@@ -39,6 +40,7 @@ export function App(): JSX.Element {
   return (
     <header style={styles.bar}>
       <div style={styles.left}>
+        <img src={iconSrc} alt="Littoral" style={styles.icon} />
         <strong style={styles.brand}>Littoral</strong>
         <span style={styles.dim}>{state}</span>
         <span style={styles.track}>{trackLabel}</span>
@@ -85,6 +87,7 @@ const styles: Record<string, React.CSSProperties> = {
   } as React.CSSProperties,
   left: { display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, overflow: 'hidden' },
   right: { display: 'flex', alignItems: 'center', gap: 12, WebkitAppRegion: 'no-drag' } as React.CSSProperties,
+  icon: { width: 28, height: 28, flexShrink: 0 },
   brand: { fontSize: 14, letterSpacing: 0.5 },
   track: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '50vw' },
   dim: { color: '#888', fontSize: 12 },
