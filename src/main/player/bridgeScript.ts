@@ -1,11 +1,13 @@
 /**
  * Script injecté dans la BrowserView qui charge listen.tidal.com.
  *
- * Stratégie :
- * - Utilise la Media Session API (navigator.mediaSession) que Tidal alimente
- *   pour récupérer les métadonnées du morceau et l'état playing/paused.
- * - Observe le <audio>/<video> sous-jacent pour position/duration.
- * - Fallback sur les sélecteurs DOM des contrôles du player pour play/pause/next/prev/seek/volume.
+ * Sources d'état (par priorité décroissante) :
+ * - Store Redux Tidal (slices `playbackControls` + `entities.tracks/artists/albums`)
+ *   pour les métadonnées riches avec le vrai identifiant Tidal.
+ * - Fallback : `navigator.mediaSession.metadata` + élément `<audio>`/`<video>` actif.
+ *
+ * Contrôle : manipulation directe du media element (seek, volume, play, pause) ;
+ * clic sur sélecteurs DOM (`[data-test="next"]`, etc.) pour next/prev.
  *
  * Ce script communique avec le main process via `window.tidalBridge` (exposé par le preload de la view).
  */

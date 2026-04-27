@@ -30,7 +30,7 @@ font juste `executeJavaScript('window.__tidalControl.xxx()')`.
 | now-playing (rich)      | Lecture de `state.playbackControls.mediaProduct` + `state.entities.tracks/artists/albums` du store Redux | **Élevé** — noms de slice/clé spécifiques |
 | now-playing (fallback)  | `navigator.mediaSession.metadata` + `mediaElement.currentTime/duration` | Faible |
 | queue (lecture)         | `state.playQueue.elements` du store Redux                 | **Élevé** |
-| queue (ajout)           | `GET /v1/tracks/{id}/mix` puis `dispatch({ type: 'playQueue/ADD_MEDIA_ITEMS_TO_QUEUE', payload: { mediaItemIds, position, sourceContext: { id: null, type: 'UNKNOWN' } } })` | **Élevé** — schéma d'action fragile |
+| queue (ajout)           | `dispatch({ type: 'playQueue/ADD_MEDIA_ITEMS_TO_QUEUE', payload: { mediaItemIds, position, sourceContext } })` précédé d'une navigation interne vers `/track/<id>` (via `router/PUSH`) si l'entité n'est pas dans `entities.tracks` | **Élevé** — schéma d'action fragile |
 | événements WebSocket    | `store.subscribe()` détecte les changements du slice `playQueue`, ré-émet vers le main | Élevé |
 
 ## Trouver le store Redux

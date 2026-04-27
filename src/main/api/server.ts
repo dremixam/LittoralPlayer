@@ -127,8 +127,6 @@ function resolveSpecPath(): string {
   ];
   for (const p of candidates) {
     try {
-      // require.resolve équivalent : on tente un fs.statSync via dynamic import
-      const fs = require('node:fs') as typeof import('node:fs');
       if (fs.existsSync(p)) return p;
     } catch { /* ignore */ }
   }

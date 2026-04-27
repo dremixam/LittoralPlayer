@@ -2,8 +2,8 @@ import Store from 'electron-store';
 import { DEFAULT_API_PORT } from '../shared/constants';
 
 /**
- * Token Tidal extrait du localStorage de la WebView (listen.tidal.com).
- * On le re-lit régulièrement côté main pour rester à jour avec d'éventuels refresh.
+ * Token Tidal capturé via `webRequest.onBeforeSendHeaders` sur les requêtes
+ * de la WebView vers `*.tidal.com`. Persisté pour survie au redémarrage.
  */
 export interface PersistedTokens {
   accessToken: string;

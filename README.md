@@ -71,7 +71,7 @@ openapi/tidal-player-api.yaml  # source de vérité
 Le main process injecte un script (`src/main/player/bridgeScript.ts`) dans la WebContentsView qui :
 
 - lit l'état **directement depuis le store Redux Tidal** (slice `playbackControls` + `entities.tracks`/`albums`/`artists`) avec un fallback sur `navigator.mediaSession.metadata` ;
-- pilote la **vraie file d'attente Tidal** (slice `playQueue`) via dispatch d'actions (précédé d'un `GET /v1/tracks/{id}/mix` indispensable) ;
+- pilote la **vraie file d'attente Tidal** (slice `playQueue`) via dispatch de `playQueue/ADD_MEDIA_ITEMS_TO_QUEUE` (précédé d'une navigation interne vers `/track/<id>` si l'entité n'est pas dans le cache Redux) ;
 - expose `window.__tidalControl.{play,pause,toggle,next,previous,seek,setVolume,enqueue,getNowPlaying,getQueue}` que le main appelle via `webContents.executeJavaScript` ;
 - diffuse les snapshots/positions/changements de queue au main via le canal `tidal-bridge:message` (avec fallback `console.log('[TIDAL_BRIDGE]...')`).
 
@@ -79,7 +79,7 @@ Le main process injecte un script (`src/main/player/bridgeScript.ts`) dans la We
 
 ### Authentification (single login)
 
-`src/main/auth/webviewToken.ts` parcourt en permanence (toutes les 5 s) les clés `_TIDAL_*` du `localStorage` de la WebView et y détecte un `accessToken`. Dès qu'il apparaît :
+`src/main/auth/webviewToken.ts` intercepte via `webRequest.onBeforeSendHeaders` les requêtes sortantes de la WebView vers `*.tidal.com` et capture le header `Authorization: Bearer …`. Dès qu'un token est détecté :
 
 - il est persisté via `electron-store` (`settings.tokens`) ;
 - `store.auth` passe à `authenticated: true` (avec `userId` et `countryCode` extraits) ;
@@ -171,15 +171,13 @@ Remove-Item "$env:APPDATA\Littoral\WidevineCdm","$env:APPDATA\Littoral\MediaFoun
 
 Sans abonnement payant, Tidal renvoie de toute façon S6001 sur les pistes streamées (les previews 30s peuvent passer).
 
-### Récapitulatif checklist
+### Récapitulatif
 
-| ✅ | Étape |
-|----|------|
-| ☐ | `npm install` avec Castlabs ≥ v41.x dans `package.json` |
-| ☐ | Compte EVS créé (`evs.account signup` + validation e-mail) |
-| ☐ | Session EVS active (`evs.account reauth`) |
-| ☐ | Binaire signé (`postinstall` automatique ou manuel) |
-| ☐ | Compte Tidal HiFi connecté dans la WebView |
+- `npm install` avec Castlabs ≥ v41.x dans `package.json`
+- Compte EVS créé (`evs.account signup` + validation e-mail)
+- Session EVS active (`evs.account reauth`)
+- Binaire signé (`postinstall` automatique ou manuel)
+- Compte Tidal HiFi connecté dans la WebView
 
 Si la lecture échoue malgré tout : ouvrir DevTools sur la WebView Tidal (auto en dev), aller dans l'onglet Network, lancer une lecture et vérifier que `POST /v2/widevine` renvoie **200** (pas 400). Si toujours 400 → re-signer + vider cache CDM.
 

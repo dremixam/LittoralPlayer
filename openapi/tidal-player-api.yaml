@@ -1,12 +1,12 @@
 openapi: 3.1.0
 info:
   title: Littoral - Local API
-  version: 0.1.0
+  version: 1.0.0
   description: |
     API locale exposée par Littoral (lecteur Tidal Electron).
 
     - REST pour interroger l'état, contrôler la lecture, rechercher dans le catalogue, gérer la file d'attente.
-    - WebSocket sur `/events` pour être notifié en temps réel des changements de playback (play, pause, changement de morceau, position, file d'attente, etc.).
+    - WebSocket sur `/events` : snapshot initial à la connexion, puis événements `now-playing`, `playback-state`, `position`, `auth-changed` (schémas en fin de document).
 servers:
   - url: http://127.0.0.1:7143
     description: Instance locale (port par défaut, configurable)
@@ -229,7 +229,7 @@ paths:
     post:
       tags: [auth]
       operationId: startLogin
-      summary: Affiche la page de login Tidal dans la WebView (single login ; le token est ensuite extrait du localStorage)
+      summary: Affiche la page de login Tidal dans la WebView (single login ; le token est ensuite capturé via interception des requêtes de la WebView)
       responses:
         '202':
           description: WebView dirigée vers la page de login
@@ -396,9 +396,7 @@ components:
       oneOf:
         - $ref: '#/components/schemas/EventNowPlaying'
         - $ref: '#/components/schemas/EventPlaybackState'
-        - $ref: '#/components/schemas/EventTrackChanged'
         - $ref: '#/components/schemas/EventPosition'
-        - $ref: '#/components/schemas/EventQueueChanged'
         - $ref: '#/components/schemas/EventAuthChanged'
       discriminator:
         propertyName: type
@@ -411,15 +409,20 @@ components:
         timestamp: { type: string, format: date-time }
 
     EventNowPlaying:
+      description: "Événement WebSocket — émis au changement de piste, ou lors d'une reprise depuis pause (pour que les clients qui rejoignent en cours de lecture reçoivent la piste courante au snapshot initial)."
       allOf:
         - $ref: '#/components/schemas/EventBase'
         - type: object
           required: [type, payload]
           properties:
             type: { const: now-playing }
-            payload: { $ref: '#/components/schemas/NowPlaying' }
+            payload:
+              type: object
+              properties:
+                track: { $ref: '#/components/schemas/Track' }
 
     EventPlaybackState:
+      description: "Événement WebSocket — émis uniquement lors d'un changement d'état (idle → playing, playing → paused, etc.). Ne se déclenche pas si la piste change sans changement d'état."
       allOf:
         - $ref: '#/components/schemas/EventBase'
         - type: object
@@ -432,19 +435,8 @@ components:
               properties:
                 state: { $ref: '#/components/schemas/PlaybackState' }
 
-    EventTrackChanged:
-      allOf:
-        - $ref: '#/components/schemas/EventBase'
-        - type: object
-          required: [type, payload]
-          properties:
-            type: { const: track-changed }
-            payload:
-              type: object
-              properties:
-                track: { $ref: '#/components/schemas/Track' }
-
     EventPosition:
+      description: "Événement WebSocket — émis périodiquement pendant la lecture (~1×/s) avec la position courante dans le morceau."
       allOf:
         - $ref: '#/components/schemas/EventBase'
         - type: object
@@ -458,16 +450,8 @@ components:
                 positionSeconds: { type: number }
                 durationSeconds: { type: number }
 
-    EventQueueChanged:
-      allOf:
-        - $ref: '#/components/schemas/EventBase'
-        - type: object
-          required: [type, payload]
-          properties:
-            type: { const: queue-changed }
-            payload: { $ref: '#/components/schemas/Queue' }
-
     EventAuthChanged:
+      description: "Événement WebSocket — émis quand le token Tidal est capturé (connexion détectée dans la WebView) ou perdu (logout)."
       allOf:
         - $ref: '#/components/schemas/EventBase'
         - type: object
