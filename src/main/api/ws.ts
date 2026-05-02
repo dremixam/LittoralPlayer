@@ -33,14 +33,20 @@ export function attachWebSocket(httpServer: Server): WebSocketServer {
 
     const unsubscribe = eventBus.onEvent(event => safeSend(ws, event));
 
-    ws.on('close', unsubscribe);
-    ws.on('error', unsubscribe);
-
     // Ping keep-alive
     const ping = setInterval(() => {
       if (ws.readyState === ws.OPEN) ws.ping();
     }, 30_000);
-    ws.on('close', () => clearInterval(ping));
+
+    let cleaned = false;
+    const cleanup = (): void => {
+      if (cleaned) return;
+      cleaned = true;
+      clearInterval(ping);
+      unsubscribe();
+    };
+    ws.on('close', cleanup);
+    ws.on('error', cleanup);
   });
 
   return wss;

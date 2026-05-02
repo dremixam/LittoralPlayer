@@ -58,7 +58,7 @@ function persistToken(accessToken: string): void {
     userId: tokens.userId !== undefined ? String(tokens.userId) : undefined,
     countryCode: tokens.countryCode,
   });
-  console.log(`[auth] captured token (uid=${decoded?.uid ?? '?'} cid=${decoded?.cid ?? '?'} scope="${decoded?.scope ?? '?'}")`);
+  console.log('[auth] token captured (expires:', tokens.expiresAt ? new Date(tokens.expiresAt).toISOString() : 'unknown', ')');
 }
 
 /**
@@ -83,12 +83,12 @@ export function startTokenWatcher(view: WebContentsView): void {
         const xt = headers['X-Tidal-Token'] ?? headers['x-tidal-token'];
         if (typeof xt === 'string' && xt && xt !== capturedTidalToken) {
           capturedTidalToken = xt;
-          console.log('[auth] captured X-Tidal-Token:', xt);
+          console.log('[auth] X-Tidal-Token captured');
         }
         try {
           const url = new URL(details.url);
           const cc = url.searchParams.get('countryCode');
-          if (cc) {
+          if (cc && /^[A-Z]{2}$/.test(cc)) {
             const cur = settings.get('tokens');
             if (cur && cur.countryCode !== cc) {
               settings.set('tokens', { ...cur, countryCode: cc });

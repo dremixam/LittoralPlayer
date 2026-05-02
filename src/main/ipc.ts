@@ -12,9 +12,11 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle(IPC_CHANNELS.openExternal, async (_e, url: unknown) => {
     if (typeof url !== 'string') return;
-    // Restreint aux schemas sûrs.
-    if (!/^https?:\/\//i.test(url)) return;
-    await shell.openExternal(url);
+    // Restreint aux schemas sûrs : http(s) uniquement, pas de javascript:, file:, etc.
+    let parsed: URL;
+    try { parsed = new URL(url); } catch { return; }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+    await shell.openExternal(parsed.toString());
   });
 
   ipcMain.handle(IPC_CHANNELS.authStart, async () => {

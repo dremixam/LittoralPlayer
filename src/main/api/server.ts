@@ -37,12 +37,22 @@ export async function startApiServer(): Promise<ApiServerInfo> {
   const app = express();
   app.use(express.json({ limit: '256kb' }));
 
-  // CORS local : on autorise tout en local. Restreindre selon vos besoins.
-  app.use((_req: Request, res: Response, next: NextFunction) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+  // CORS local-only : seules les origines loopback et les outils sans Origin
+  // (curl, scripts node, Postman) sont autorisés. On évite ainsi qu'un site web
+  // visité dans le navigateur puisse piloter le lecteur via cette API locale.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const origin = req.headers.origin;
+    const allowed =
+      !origin ||
+      /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin);
+    if (allowed && origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-    if (_req.method === 'OPTIONS') return res.status(204).end();
+    if (req.method === 'OPTIONS') return res.status(allowed ? 204 : 403).end();
+    if (!allowed) return res.status(403).json({ code: 'forbidden_origin', message: 'Origin not allowed' });
     next();
   });
 

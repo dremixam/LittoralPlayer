@@ -124,6 +124,14 @@ export function attachConsoleBridge(): void {
 }
 
 function handleBridgeMessage(msg: BridgeMessage): void {
+  if (!msg || typeof msg !== 'object' || typeof (msg as { kind?: unknown }).kind !== 'string') {
+    console.warn('[player] ignored malformed bridge message');
+    return;
+  }
+  if (msg.kind !== 'snapshot' && msg.kind !== 'position' && msg.kind !== 'queue') {
+    console.warn('[player] ignored bridge message with unknown kind:', msg.kind);
+    return;
+  }
   if (msg.kind === 'position') {
     const p = msg.data as { positionSeconds: number; durationSeconds?: number };
     store.emitPosition(p.positionSeconds, p.durationSeconds);
@@ -206,7 +214,9 @@ export const playerControl = {
    */
   enqueueInTidal: async (trackId: string, position: 'next' | 'last' = 'last') => {
     // Best-effort : prefetch /v1/.../mix côté main (cache HTTP côté Tidal).
-    void prefetchTrackMix(trackId);
+    void prefetchTrackMix(trackId).catch(err =>
+      console.warn('[player] prefetchTrackMix failed:', err instanceof Error ? err.message : err),
+    );
     // Récupère l'entité v2 (JSON:API) pour extraire l'albumId. La saga
     // ADD_MEDIA_ITEMS_TO_QUEUE utilise sourceContext pour déclencher la
     // RTK Query qui hydrate l'entité — sans contexte (UNKNOWN) elle ne

@@ -16,7 +16,9 @@ const wrap = (fn: () => Promise<unknown> | unknown) => async (_c: Context, _req:
     res.status(204).end();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    res.status(502).json({ code: 'player_command_failed', message });
+    if (!res.headersSent) {
+      res.status(502).json({ code: 'player_command_failed', message });
+    }
   }
 };
 
@@ -56,9 +58,14 @@ export const handlers: Record<string, Handler> = {
   previous: wrap(() => playerControl.previous()),
 
   seek: async (c, _req, res) => {
-    const body = c.request.requestBody as { positionSeconds: number };
+    const body = c.request.requestBody as { positionSeconds?: unknown };
+    const pos = Number(body?.positionSeconds);
+    if (!Number.isFinite(pos) || pos < 0) {
+      res.status(400).json({ code: 'invalid_body', message: 'positionSeconds must be a non-negative number' });
+      return;
+    }
     try {
-      await playerControl.seek(body.positionSeconds);
+      await playerControl.seek(pos);
       res.status(204).end();
     } catch (err) {
       res.status(502).json({ code: 'player_command_failed', message: (err as Error).message });
@@ -66,10 +73,16 @@ export const handlers: Record<string, Handler> = {
   },
 
   setVolume: async (c, _req, res) => {
-    const body = c.request.requestBody as { volume: number };
+    const body = c.request.requestBody as { volume?: unknown };
+    const raw = Number(body?.volume);
+    if (!Number.isFinite(raw)) {
+      res.status(400).json({ code: 'invalid_body', message: 'volume must be a number' });
+      return;
+    }
+    const volume = Math.max(0, Math.min(100, raw));
     try {
-      await playerControl.setVolume(body.volume);
-      store.setNowPlaying({ volume: body.volume });
+      await playerControl.setVolume(volume);
+      store.setNowPlaying({ volume });
       res.status(204).end();
     } catch (err) {
       res.status(502).json({ code: 'player_command_failed', message: (err as Error).message });
@@ -87,11 +100,16 @@ export const handlers: Record<string, Handler> = {
   },
 
   enqueueTrack: async (c, _req, res) => {
-    const body = c.request.requestBody as { trackId: string; position?: 'end' | 'next' };
+    const body = c.request.requestBody as { trackId?: unknown; position?: unknown };
+    const trackId = String(body?.trackId ?? '');
+    if (!/^\d+$/.test(trackId)) {
+      res.status(400).json({ code: 'invalid_body', message: 'trackId must be a numeric string' });
+      return;
+    }
     // Pousse dans la "Liste d'attente" native Tidal. 'end' (API) ↔ 'last' (Tidal).
     const tidalPos: 'next' | 'last' = body.position === 'next' ? 'next' : 'last';
     try {
-      await playerControl.enqueueInTidal(body.trackId, tidalPos);
+      await playerControl.enqueueInTidal(trackId, tidalPos);
     } catch (err) {
       console.warn('[api] enqueueInTidal failed:', (err as Error).message);
     }
@@ -105,12 +123,17 @@ export const handlers: Record<string, Handler> = {
   },
 
   search: async (c, _req, res) => {
-    const q = String(c.request.query.q ?? '');
+    const q = String(c.request.query.q ?? '').slice(0, 256);
+    if (!q.trim()) {
+      res.status(400).json({ code: 'invalid_query', message: 'q must be a non-empty string' });
+      return;
+    }
     const types = String(c.request.query.types ?? 'tracks,albums,artists,playlists')
       .split(',')
       .map(s => s.trim())
       .filter(Boolean);
-    const limit = Number(c.request.query.limit ?? 20);
+    const rawLimit = Number(c.request.query.limit ?? 20);
+    const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(50, rawLimit)) : 20;
     try {
       const results = await search({ q, types, limit });
       res.json(results);
@@ -125,6 +148,10 @@ export const handlers: Record<string, Handler> = {
 
   getTrack: async (c, _req, res) => {
     const trackId = String(c.request.params.trackId);
+    if (!/^\d+$/.test(trackId)) {
+      res.status(400).json({ code: 'invalid_param', message: 'trackId must be numeric' });
+      return;
+    }
     try {
       const track = await getTrack(trackId);
       if (!track) {
