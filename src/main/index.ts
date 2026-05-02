@@ -6,6 +6,7 @@ import { createPlayerView, attachConsoleBridge } from './player/controller';
 import { bootstrapAuth } from './auth/webviewToken';
 import { registerIpc } from './ipc';
 import { initDiscordRpc, destroyDiscordRpc } from './integrations/discordRpc';
+import { initSmtc, destroySmtc } from './integrations/smtc';
 
 // Castlabs ECS : on autorise explicitement le component updater à fonctionner
 // (certaines installations Windows bloquent l'auto-install via le sandbox).
@@ -19,6 +20,13 @@ app.commandLine.appendSwitch('no-sandbox');
 
 // Nom d'app stable -> dossier userData stable (%APPDATA%/Littoral)
 app.setName('Littoral');
+
+// AppUserModelId : identifiant Windows pour la barre des tâches, les notifications
+// et surtout le SMTC (sans ça, Windows affiche "Application Inconnue" comme source
+// audio dans le lock screen / widget media).
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.dremixam.littoral');
+}
 
 // Supprime complètement le menu File/Edit/View natif.
 Menu.setApplicationMenu(null);
@@ -158,6 +166,7 @@ app.whenReady().then(async () => {
   registerIpc(() => mainWindow);
   await createWindow();
   initDiscordRpc();
+  initSmtc();
 
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) await createWindow();
@@ -166,6 +175,7 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', async () => {
   destroyDiscordRpc();
+  destroySmtc();
   await stopApiServer();
   if (process.platform !== 'darwin') app.quit();
 });

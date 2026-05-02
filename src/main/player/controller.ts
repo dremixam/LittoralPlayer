@@ -154,6 +154,14 @@ function handleBridgeMessage(msg: BridgeMessage): void {
   });
 }
 
+/**
+ * Exécute du JavaScript arbitraire dans la WebContentsView Tidal.
+ * Utilisé par les intégrations externes (ex : mediaSession SMTC).
+ */
+export async function executeInPlayerView(expr: string): Promise<unknown> {
+  return exec(expr);
+}
+
 // --- Commandes exposées aux handlers API ---
 async function exec<T = unknown>(expr: string): Promise<T | null> {
   if (!view) {
