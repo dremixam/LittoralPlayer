@@ -5,6 +5,7 @@ import { startApiServer, stopApiServer } from './api/server';
 import { createPlayerView, attachConsoleBridge } from './player/controller';
 import { bootstrapAuth } from './auth/webviewToken';
 import { registerIpc } from './ipc';
+import { initDiscordRpc, destroyDiscordRpc } from './integrations/discordRpc';
 
 // Castlabs ECS : on autorise explicitement le component updater à fonctionner
 // (certaines installations Windows bloquent l'auto-install via le sandbox).
@@ -156,6 +157,7 @@ app.whenReady().then(async () => {
   await startApiServer();
   registerIpc(() => mainWindow);
   await createWindow();
+  initDiscordRpc();
 
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) await createWindow();
@@ -163,6 +165,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', async () => {
+  destroyDiscordRpc();
   await stopApiServer();
   if (process.platform !== 'darwin') app.quit();
 });
