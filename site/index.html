@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Littoral — TIDAL player with local API</title>
+    <meta name="description"
+        content="A TIDAL desktop player for Windows that exposes a local REST + WebSocket API for full playback control from any application." />
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #111111;
+            --surface-2: #181818;
+            --border: #1f1f1f;
+            --accent: #4f8ef7;
+            --accent-dim: rgba(79, 142, 247, 0.12);
+            --accent-ring: rgba(79, 142, 247, 0.25);
+            --text: #e2e2e2;
+            --muted: #737373;
+            --muted-2: #555;
+            --radius: 10px;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            font-size: 15px;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        /* ── Layout helpers ───────────────────────────────────── */
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* ── Nav ─────────────────────────────────────────────── */
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 1px solid var(--border);
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(12px);
+        }
+
+        nav .inner {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 0 24px;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .nav-brand {
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: -.01em;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            font-size: 13.5px;
+            color: var(--muted);
+            text-decoration: none;
+            transition: color .15s;
+        }
+
+        .nav-links a:hover {
+            color: var(--text);
+        }
+
+        /* ── Hero ────────────────────────────────────────────── */
+        .hero {
+            padding: 96px 24px 88px;
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--accent-dim);
+            color: var(--accent);
+            border: 1px solid var(--accent-ring);
+            border-radius: 100px;
+            padding: 5px 14px;
+            font-size: 12.5px;
+            font-weight: 500;
+            letter-spacing: .03em;
+            margin-bottom: 28px;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.8rem, 7vw, 4.5rem);
+            font-weight: 800;
+            letter-spacing: -.04em;
+            line-height: 1.05;
+            margin-bottom: 20px;
+        }
+
+        .hero .sub {
+            font-size: 1.1rem;
+            color: var(--muted);
+            max-width: 500px;
+            margin: 0 auto 40px;
+            line-height: 1.65;
+        }
+
+        .cta-row {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 12px 24px;
+            border-radius: var(--radius);
+            font-size: 14.5px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: opacity .15s, transform .12s;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            opacity: .86;
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid var(--border);
+        }
+
+        .btn-ghost:hover {
+            color: var(--text);
+        }
+
+        .hero-note {
+            margin-top: 18px;
+            font-size: 12.5px;
+            color: var(--muted-2);
+        }
+
+        .hero-kofi-btn {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            margin-top: 20px;
+            padding: 10px 22px;
+            border-radius: 8px;
+            background: var(--surface);
+            border: 1px solid #ff5e5b55;
+            text-decoration: none;
+            transition: border-color .15s;
+        }
+
+        .hero-kofi-btn:hover {
+            border-color: #ff5e5baa;
+        }
+
+        .hero-kofi-btn .kofi-btn-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #ff5e5b;
+        }
+
+        .hero-kofi-btn .kofi-btn-sub {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        /* ── Section headings ────────────────────────────────── */
+        .section-label {
+            font-size: 11.5px;
+            font-weight: 600;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--muted-2);
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        /* ── Features ────────────────────────────────────────── */
+        .features-section {
+            padding: 0 0 80px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+            gap: 14px;
+        }
+
+        .feature {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            transition: border-color .2s;
+        }
+
+        .feature:hover {
+            border-color: #2e2e2e;
+        }
+
+        .feature-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            margin-bottom: 14px;
+        }
+
+        .feature h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .feature p {
+            font-size: 13.5px;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        code {
+            font-family: 'Menlo', 'Consolas', monospace;
+            font-size: 12px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1px 5px;
+            color: #c8c8c8;
+        }
+
+        /* ── API preview ─────────────────────────────────────── */
+        .api-section {
+            padding: 0 0 80px;
+        }
+
+        .api-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .api-card-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .api-card-header .logo-icon {
+            width: 18px;
+            height: 18px;
+            display: block;
+            opacity: .55;
+        }
+
+        .api-card-header span {
+            font-size: 12px;
+            color: var(--muted-2);
+            margin-left: 4px;
+            font-family: 'Menlo', 'Consolas', monospace;
+        }
+
+        /* ── Author ──────────────────────────────────────────── */
+        .author-section {
+            padding: 0 0 80px;
+        }
+
+        .author-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px 32px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 28px;
+        }
+
+        .author-avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .author-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .author-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .author-info h3 {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .author-info p {
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.55;
+            margin-bottom: 2px;
+        }
+
+        .author-top {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .author-links {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 158px;
+            flex-shrink: 0;
+        }
+
+        .author-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 8px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            font-size: 13px;
+            font-weight: 500;
+            text-decoration: none;
+            color: var(--text);
+            transition: border-color .15s, color .15s, background .15s;
+            width: 100%;
+        }
+
+        .author-link:hover {
+            border-color: #333;
+            color: #fff;
+        }
+
+        .author-link .badge-icon {
+            font-size: 14px;
+        }
+
+        .author-link.author-link-twitch {
+            background: #7d2df1;
+            border-color: transparent;
+            color: #fff;
+        }
+
+        .author-link.author-link-twitch:hover {
+            background: #6a22d4;
+            border-color: transparent;
+            color: #fff;
+            opacity: 1;
+        }
+
+        .author-link.author-link-kofi {
+            background: var(--surface-2);
+            border-color: #ff5e5b55;
+            color: #ff5e5b;
+        }
+
+        .author-link.author-link-kofi:hover {
+            border-color: #ff5e5baa;
+            color: #ff7a78;
+        }
+
+        .api-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .api-table tr:not(:last-child) td {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .api-table td {
+            padding: 11px 20px;
+            font-size: 13px;
+        }
+
+        .api-table td:first-child {
+            width: 60px;
+            font-family: 'Menlo', 'Consolas', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .api-table td:nth-child(2) {
+            font-family: 'Menlo', 'Consolas', monospace;
+            font-size: 12px;
+            color: #c8c8c8;
+        }
+
+        .api-table td:last-child {
+            color: var(--muted);
+        }
+
+        /* ── Requirements ────────────────────────────────────── */
+        .req-section {
+            padding: 0 0 80px;
+        }
+
+        .req-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 14px;
+        }
+
+        .req-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+        }
+
+        .req-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .req-card h3 {
+            font-size: 13.5px;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+
+        .req-card p {
+            font-size: 12.5px;
+            color: var(--muted);
+        }
+
+        /* ── Footer ──────────────────────────────────────────── */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 28px 24px;
+            text-align: center;
+            font-size: 13px;
+            color: var(--muted-2);
+        }
+
+        footer a {
+            color: var(--muted);
+            text-decoration: none;
+            transition: color .15s;
+        }
+
+        footer a:hover {
+            color: var(--text);
+        }
+
+        footer .sep {
+            margin: 0 8px;
+        }
+
+        /* ── Responsive ──────────────────────────────────────── */
+        @media (max-width: 600px) {
+            .hero {
+                padding: 64px 20px 60px;
+            }
+
+            .api-table td:last-child {
+                display: none;
+            }
+
+            .nav-links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav>
+        <div class="inner">
+            <a class="nav-brand" href="#" style="display:flex;align-items:center;gap:9px;">
+                <img src="icon.svg" alt="" width="28" height="28" style="display:block;" />
+                Littoral
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#api">API</a></li>
+                <li><a href="https://github.com/DrEmixam/LittoralPlayer">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="badge">Windows · Free · Open source</div>
+        <h1>Littoral</h1>
+        <p class="sub">
+            A TIDAL desktop player that exposes a local REST&nbsp;+&nbsp;WebSocket API —
+            control playback and receive real‑time events from any application.
+        </p>
+        <div class="cta-row">
+            <a id="download-btn" class="btn btn-primary"
+                href="https://github.com/DrEmixam/LittoralPlayer/releases/latest">
+                ↓&nbsp; Download for Windows
+            </a>
+            <a class="btn btn-ghost" href="https://github.com/DrEmixam/LittoralPlayer">
+                View on GitHub
+            </a>
+        </div>
+        <p class="hero-note" id="hero-note">Requires a TIDAL HiFi or HiFi Plus subscription</p>
+        <a class="hero-kofi-btn" href="https://ko-fi.com/dremixam" target="_blank" rel="noopener">
+            <span class="kofi-btn-label">☕ Support on Ko-fi</span>
+            <span class="kofi-btn-sub">Buy me a coffee to keep the project alive!</span>
+        </a>
+    </section>
+
+    <!-- Features -->
+    <section class="features-section" id="features">
+        <div class="container">
+            <p class="section-label">Features</p>
+            <div class="features-grid">
+
+                <div class="feature">
+                    <div class="feature-icon">🎵</div>
+                    <h3>Full playback control</h3>
+                    <p>Play, pause, skip, seek, adjust volume and manage the queue — all accessible through a clean HTTP
+                        API.</p>
+                </div>
+
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Real‑time WebSocket events</h3>
+                    <p>Subscribe to <code>now-playing</code>, <code>playback-state</code> and <code>position</code>
+                        events. Build dashboards, stream overlays or automations on top.</p>
+                </div>
+
+                <div class="feature">
+                    <div class="feature-icon">🔎</div>
+                    <h3>Catalogue search</h3>
+                    <p>Search tracks, albums, artists and playlists via the API and enqueue results directly from any
+                        external app or script.</p>
+                </div>
+
+                <div class="feature">
+                    <div class="feature-icon">🖥️</div>
+                    <h3>Windows media integration</h3>
+                    <p>Track info and artwork appear on the lock screen, in the taskbar media widget and in Xbox Game
+                        Bar — no setup required.</p>
+                </div>
+
+                <div class="feature">
+                    <div class="feature-icon">🎮</div>
+                    <h3>Discord Rich Presence</h3>
+                    <p>Shows the current track in your Discord status as a "Listening to…" activity. Works out of the
+                        box.</p>
+                </div>
+
+                <div class="feature">
+                    <div class="feature-icon">📄</div>
+                    <h3>Interactive API docs</h3>
+                    <p>A Swagger UI is served locally at <code>127.0.0.1:7143/docs</code> — explore and test every
+                        endpoint without leaving your browser.</p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- API preview -->
+    <section class="api-section" id="api">
+        <div class="container">
+            <p class="section-label">REST API — quick look</p>
+            <div class="api-card">
+                <div class="api-card-header">
+                    <img src="icon.svg" alt="" class="logo-icon" />
+                    <span>http://127.0.0.1:7143</span>
+                </div>
+                <table class="api-table">
+                    <tbody>
+                        <tr>
+                            <td>GET</td>
+                            <td>/now-playing</td>
+                            <td>Current track, state and position</td>
+                        </tr>
+                        <tr>
+                            <td>POST</td>
+                            <td>/playback/toggle</td>
+                            <td>Play / pause</td>
+                        </tr>
+                        <tr>
+                            <td>POST</td>
+                            <td>/playback/next</td>
+                            <td>Skip to next track</td>
+                        </tr>
+                        <tr>
+                            <td>POST</td>
+                            <td>/playback/seek</td>
+                            <td>Seek to a position in seconds</td>
+                        </tr>
+                        <tr>
+                            <td>POST</td>
+                            <td>/playback/volume</td>
+                            <td>Set volume (0–100)</td>
+                        </tr>
+                        <tr>
+                            <td>GET</td>
+                            <td>/queue</td>
+                            <td>Upcoming tracks</td>
+                        </tr>
+                        <tr>
+                            <td>POST</td>
+                            <td>/queue/enqueue</td>
+                            <td>Add a track to the queue</td>
+                        </tr>
+                        <tr>
+                            <td>GET</td>
+                            <td>/catalogue/search</td>
+                            <td>Search TIDAL catalogue</td>
+                        </tr>
+                        <tr>
+                            <td>GET</td>
+                            <td>/docs</td>
+                            <td>Interactive Swagger UI</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Author -->
+    <section class="author-section">
+        <div class="container">
+            <p class="section-label">Made by</p>
+            <div class="author-card">
+                <div class="author-top">
+                    <div class="author-avatar" id="author-avatar">🎮</div>
+                    <div class="author-info">
+                        <h3>DrEmixam</h3>
+                        <p>Streamer &amp; hacker world-famous in the neighborhood. Time Magazine's 2006 Person of the Year.
+                            My creations are only endorsed by those who believe in them.</p>
+                        <p>Dad of Léon the robot.</p>
+                        <p>Creator of video game entertainment and online content since 2002.</p>
+                    </div>
+                </div>
+                <div class="author-links">
+                    <a class="author-link author-link-twitch" href="https://twitch.tv/dremixam" target="_blank"
+                        rel="noopener">
+                        <svg width="14" height="16" viewBox="0 0 40 46" fill="currentColor"
+                            xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+                            <path
+                                d="M2.12 0L0 5.31V40.5h13.5V46h7.59l5.5-5.5h9l12-12V0H2.12zM36.59 25.5l-7 7h-11l-5.5 5.5v-5.5H4.5V4.5h32.09V25.5z" />
+                            <path d="M16.5 23h4V11h-4v12zM26.5 23h4V11h-4v12z" />
+                        </svg>
+                        Twitch
+                    </a>
+                    <a class="author-link" href="https://dremixam.com" target="_blank" rel="noopener">
+                        <span class="badge-icon">🌐</span> dremixam.com
+                    </a>
+                    <a class="author-link author-link-kofi" href="https://ko-fi.com/dremixam" target="_blank" rel="noopener">
+                        <span class="badge-icon">☕</span> Ko-fi
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Requirements -->
+    <section class="req-section">
+        <div class="container">
+            <p class="section-label">Requirements</p>
+            <div class="req-grid">
+
+                <div class="req-card">
+                    <div class="req-icon">🪟</div>
+                    <div>
+                        <h3>Windows 10 or 11 (64-bit)</h3>
+                        <p>Widevine DRM requires Windows. macOS and Linux are not supported.</p>
+                    </div>
+                </div>
+
+                <div class="req-card">
+                    <div class="req-icon">🎵</div>
+                    <div>
+                        <h3>TIDAL HiFi or HiFi Plus</h3>
+                        <p>An active paid TIDAL subscription is required for DRM-protected streams.</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>
+            Littoral is open source and not affiliated with TIDAL.
+            <span class="sep">·</span>
+            <a href="https://github.com/DrEmixam/LittoralPlayer">GitHub</a>
+            <span class="sep">·</span>
+            <a href="https://github.com/DrEmixam/LittoralPlayer/releases">Releases</a>
+            <span class="sep">·</span>
+            <a href="https://github.com/DrEmixam/LittoralPlayer/blob/main/docs/developer.md">Developer docs</a>
+        </p>
+    </footer>
+
+    <script>
+        // Dynamically resolve the latest release download URL from the GitHub API.
+        // Update REPO if the repository was created under a different name.
+        const REPO = 'DrEmixam/LittoralPlayer';
+
+        const btn = document.getElementById('download-btn');
+        const note = document.getElementById('hero-note');
+
+        fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
+            .then(r => {
+                console.log('[download] fetch status:', r.status, r.ok);
+                return r.ok ? r.json() : null;
+            })
+            .then(data => {
+                if (!data) { console.warn('[download] no data returned'); return; }
+                console.log('[download] tag_name:', data.tag_name);
+                console.log('[download] assets:', data.assets && data.assets.map(a => a.name));
+                const asset = data.assets && data.assets.find(a => a.name.toLowerCase().endsWith('.exe'));
+                if (asset) {
+                    console.log('[download] resolved .exe asset:', asset.browser_download_url);
+                    btn.href = asset.browser_download_url;
+                } else {
+                    console.warn('[download] no .exe asset found, keeping fallback href');
+                }
+                if (data.tag_name) {
+                    const v = document.createTextNode(` · Latest: ${data.tag_name}`);
+                    note.appendChild(v);
+                }
+            })
+            .catch(err => { console.error('[download] fetch error:', err); });
+
+        // Fetch avatar from Bluesky public API (no auth required)
+        const BSKY_HANDLE = 'dremixam.com';
+        const avatarEl = document.getElementById('author-avatar');
+        fetch(`https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${BSKY_HANDLE}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data && data.avatar && avatarEl) {
+                    avatarEl.innerHTML = `<img src="${data.avatar}" alt="DrEmixam" />`;
+                }
+            })
+            .catch(() => { /* keep emoji fallback */ });
+    </script>
+
+</body>
+
+</html>
