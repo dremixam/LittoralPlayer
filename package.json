@@ -1,6 +1,6 @@
 {
   "name": "littoral",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Littoral — lecteur Tidal Electron exposant une API locale (REST + WebSocket) documentée via OpenAPI.",
   "main": "out/main/index.js",
   "author": "DrEmixam",
