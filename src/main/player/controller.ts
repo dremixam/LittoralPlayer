@@ -295,7 +295,7 @@ async function pollOnce(): Promise<void> {
     // Fallback vers snapshot() (mediaSession) si Redux n'a pas encore hydraté
     // playbackControls — cas typique d'une lecture lancée via le bouton "Aléatoire".
     const np = (await playerControl.getNowPlayingFromTidal())
-      ?? (await exec<{ state: PlaybackState; track?: Track } | null>(
+      ?? (await exec<{ state: PlaybackState; track?: Track; positionSeconds?: number; durationSeconds?: number } | null>(
           'window.__tidalControl && window.__tidalControl.snapshot()',
         ));
     if (np) {
