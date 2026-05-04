@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Littoral - Local API
-  version: 1.2.0
+  version: 1.2.1
   description: |
     Local API exposed by Littoral (Tidal Electron player).
 
