@@ -38,36 +38,60 @@ export function App(): JSX.Element {
   const docsUrl = apiInfo ? `${apiInfo.url}/docs` : null;
 
   return (
-    <header style={styles.bar}>
-      <div style={styles.left}>
-        <img src={iconSrc} alt="Littoral" style={styles.icon} />
-        <strong style={styles.brand}>Littoral</strong>
-        <span style={styles.dim}>{state}</span>
-        <span style={styles.track}>{trackLabel}</span>
-      </div>
-      <div style={styles.right}>
-        {docsUrl && (
-          <a
-            href={docsUrl}
-            onClick={(e) => {
-              e.preventDefault();
-              // Ouvre Swagger UI dans le navigateur par défaut (hors WebView Tidal).
-              void window.tidalApp.openExternal(docsUrl);
-            }}
-            style={styles.link}
-            title="Documentation API (Swagger UI)"
+    <>
+      <header style={styles.bar}>
+        <div style={styles.left}>
+          <img src={iconSrc} alt="Littoral" style={styles.icon} />
+          <strong style={styles.brand}>Littoral</strong>
+          <span style={styles.dim}>{state}</span>
+          <span style={styles.track}>{trackLabel}</span>
+        </div>
+        <div style={styles.right}>
+          {docsUrl && (
+            <a
+              href={docsUrl}
+              onClick={(e) => {
+                e.preventDefault();
+                // Ouvre Swagger UI dans le navigateur par défaut (hors WebView Tidal).
+                void window.tidalApp.openExternal(docsUrl);
+              }}
+              style={styles.link}
+              title="Documentation API (Swagger UI)"
+            >
+              API docs
+            </a>
+          )}
+          <span style={styles.dim}>{apiInfo ? apiInfo.url : '...'}</span>
+          <button
+            style={styles.iconBtn}
+            onClick={() => void window.tidalApp.openCorsPanel()}
+            title="Allowed CORS origins"
           >
-            API docs
-          </a>
-        )}
-        <span style={styles.dim}>{apiInfo ? apiInfo.url : '...'}</span>
-        {auth.authenticated ? (
-          <button style={styles.btn} onClick={() => void window.tidalApp.logout()}>Déconnecter</button>
-        ) : (
-          <button style={styles.btn} onClick={() => void window.tidalApp.startLogin()}>Se connecter</button>
-        )}
-      </div>
-    </header>
+            {/* Icône shield : outline + forme intérieure remplie */}
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              {/* Outline */}
+              <path
+                d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+              {/* Forme intérieure remplie, légèrement réduite */}
+              <path
+                d="M12 3.5L5 7v4c0 4.25 2.95 8.22 7 9.42 4.05-1.2 7-5.17 7-9.42V7l-7-3.5z"
+                fill="currentColor"
+                opacity="0.85"
+              />
+            </svg>
+          </button>
+          {auth.authenticated ? (
+            <button style={styles.btn} onClick={() => void window.tidalApp.logout()}>Disconnect</button>
+          ) : (
+            <button style={styles.btn} onClick={() => void window.tidalApp.startLogin()}>Sign in</button>
+          )}
+        </div>
+      </header>
+    </>
   );
 }
 
@@ -94,6 +118,11 @@ const styles: Record<string, React.CSSProperties> = {
   link: {
     color: '#7fc7ff', textDecoration: 'none', fontSize: 12, padding: '4px 8px',
     border: '1px solid #234', borderRadius: 4, WebkitAppRegion: 'no-drag',
+  } as React.CSSProperties,
+  iconBtn: {
+    background: 'none', border: '1px solid #2a2a2a', color: '#888', cursor: 'pointer',
+    borderRadius: 4, padding: '4px 6px', display: 'flex', alignItems: 'center',
+    WebkitAppRegion: 'no-drag',
   } as React.CSSProperties,
   btn: {
     background: '#1f1f1f', color: '#eee', border: '1px solid #333',

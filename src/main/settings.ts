@@ -1,5 +1,5 @@
 import Store from 'electron-store';
-import { DEFAULT_API_PORT } from '../shared/constants';
+import { DEFAULT_API_PORT, DEFAULT_CORS_ORIGINS } from '../shared/constants';
 
 /**
  * Token Tidal capturé via `webRequest.onBeforeSendHeaders` sur les requêtes
@@ -17,10 +17,16 @@ export interface PersistedTokens {
 interface SettingsSchema {
   apiPort: number;
   tokens?: PersistedTokens;
+  corsOrigins: string[];
+  corsAllowAll: boolean;
+  corsAllowFileOrigin: boolean;
 }
 
 const defaults: SettingsSchema = {
   apiPort: Number(process.env.TIDAL_API_PORT) || DEFAULT_API_PORT,
+  corsOrigins: DEFAULT_CORS_ORIGINS,
+  corsAllowAll: false,
+  corsAllowFileOrigin: true,
 };
 
 export const settings = new Store<SettingsSchema>({
@@ -30,4 +36,38 @@ export const settings = new Store<SettingsSchema>({
 
 export function getApiPort(): number {
   return Number(process.env.TIDAL_API_PORT) || settings.get('apiPort');
+}
+
+export function getCorsOrigins(): string[] {
+  return settings.get('corsOrigins');
+}
+
+export function addCorsOrigin(origin: string): string[] {
+  const current = settings.get('corsOrigins');
+  if (!current.includes(origin)) {
+    settings.set('corsOrigins', [...current, origin]);
+  }
+  return settings.get('corsOrigins');
+}
+
+export function removeCorsOrigin(origin: string): string[] {
+  const current = settings.get('corsOrigins');
+  settings.set('corsOrigins', current.filter(o => o !== origin));
+  return settings.get('corsOrigins');
+}
+
+export function getCorsAllowAll(): boolean {
+  return settings.get('corsAllowAll');
+}
+
+export function setCorsAllowAll(value: boolean): void {
+  settings.set('corsAllowAll', value);
+}
+
+export function getCorsAllowFileOrigin(): boolean {
+  return settings.get('corsAllowFileOrigin');
+}
+
+export function setCorsAllowFileOrigin(value: boolean): void {
+  settings.set('corsAllowFileOrigin', value);
 }

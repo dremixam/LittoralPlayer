@@ -8,7 +8,7 @@ import path from 'node:path';
 import { app as electronApp } from 'electron';
 import { handlers } from './handlers';
 import { attachWebSocket } from './ws';
-import { getApiPort } from '../settings';
+import { getApiPort, getCorsOrigins, getCorsAllowAll, getCorsAllowFileOrigin } from '../settings';
 import type { ApiServerInfo } from '../../shared/models';
 
 let server: HttpServer | null = null;
@@ -44,7 +44,10 @@ export async function startApiServer(): Promise<ApiServerInfo> {
     const origin = req.headers.origin;
     const allowed =
       !origin ||
-      /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin);
+      getCorsAllowAll() ||
+      (origin === 'null' && getCorsAllowFileOrigin()) || // file:// pages
+      /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin) ||
+      getCorsOrigins().includes(origin);
     if (allowed && origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');

@@ -7,6 +7,8 @@ export const TIDAL_LOGIN_URL = 'https://listen.tidal.com/login';
 
 export const DEFAULT_API_PORT = 7143;
 
+export const DEFAULT_CORS_ORIGINS = ['https://twitchat.fr', 'https://beta.twitchat.fr'];
+
 /**
  * Base de l'API Tidal "interne" v1, celle utilisée par listen.tidal.com.
  * On la cible avec le token OAuth extrait du localStorage de la WebView,
@@ -27,6 +29,15 @@ export const IPC_CHANNELS = {
   getAuthStatus: 'auth:status',
   getNowPlaying: 'player:now-playing',
   openExternal: 'shell:open-external',
+  getCorsOrigins: 'cors:get',
+  addCorsOrigin: 'cors:add',
+  removeCorsOrigin: 'cors:remove',
+  getCorsAllowAll: 'cors:getAllowAll',
+  setCorsAllowAll: 'cors:setAllowAll',
+  getCorsAllowFileOrigin: 'cors:getAllowFileOrigin',
+  setCorsAllowFileOrigin: 'cors:setAllowFileOrigin',
+  openCorsPanel: 'cors:openPanel',
+  closeCorsPanel: 'cors:closePanel',
   // Main -> Renderer (push)
   appEvent: 'app:event',
 } as const;

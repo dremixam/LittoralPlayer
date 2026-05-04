@@ -9,6 +9,15 @@ const api = {
   startLogin: (): Promise<{ authorizationUrl: string }> => ipcRenderer.invoke(IPC_CHANNELS.authStart),
   logout: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.authLogout),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.openExternal, url),
+  getCorsOrigins: (): Promise<string[]> => ipcRenderer.invoke(IPC_CHANNELS.getCorsOrigins),
+  addCorsOrigin: (origin: string): Promise<string[]> => ipcRenderer.invoke(IPC_CHANNELS.addCorsOrigin, origin),
+  removeCorsOrigin: (origin: string): Promise<string[]> => ipcRenderer.invoke(IPC_CHANNELS.removeCorsOrigin, origin),
+  getCorsAllowAll: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.getCorsAllowAll),
+  setCorsAllowAll: (value: boolean): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.setCorsAllowAll, value),
+  getCorsAllowFileOrigin: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.getCorsAllowFileOrigin),
+  setCorsAllowFileOrigin: (value: boolean): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.setCorsAllowFileOrigin, value),
+  openCorsPanel: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.openCorsPanel),
+  closeCorsPanel: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.closeCorsPanel),
   onEvent: (cb: (event: AppEvent) => void): (() => void) => {
     const listener = (_e: unknown, event: AppEvent) => cb(event);
     ipcRenderer.on(IPC_CHANNELS.appEvent, listener);
