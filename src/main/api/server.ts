@@ -37,9 +37,9 @@ export async function startApiServer(): Promise<ApiServerInfo> {
   const app = express();
   app.use(express.json({ limit: '256kb' }));
 
-  // CORS local-only : seules les origines loopback et les outils sans Origin
-  // (curl, scripts node, Postman) sont autorisés. On évite ainsi qu'un site web
-  // visité dans le navigateur puisse piloter le lecteur via cette API locale.
+  // CORS: loopback origins and tool calls without Origin header (curl, Postman)
+  // are always allowed. Additional origins can be whitelisted in settings,
+  // or all origins can be allowed via the "allow all" toggle.
   app.use((req: Request, res: Response, next: NextFunction) => {
     const origin = req.headers.origin;
     const allowed =

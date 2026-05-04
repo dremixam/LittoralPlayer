@@ -3,13 +3,13 @@ info:
   title: Littoral - Local API
   version: 1.2.0
   description: |
-    API locale exposée par Littoral (lecteur Tidal Electron).
+    Local API exposed by Littoral (Tidal Electron player).
 
-    - REST pour interroger l'état, contrôler la lecture, rechercher dans le catalogue, gérer la file d'attente.
-    - WebSocket sur `/events` : snapshot initial à la connexion, puis événements `now-playing`, `playback-state`, `position`, `auth-changed` (schémas en fin de document).
+    - REST endpoints to query state, control playback, search the catalogue, and manage the queue.
+    - WebSocket on `/events`: initial snapshot on connect, then `now-playing`, `playback-state`, `position`, and `auth-changed` events (schemas at the end of this document).
 servers:
   - url: http://127.0.0.1:7143
-    description: Instance locale (port par défaut, configurable)
+    description: Local instance (default port, configurable)
 
 tags:
   - name: status
@@ -23,7 +23,7 @@ paths:
     get:
       tags: [status]
       operationId: getHealth
-      summary: Sonde de santé
+      summary: Health check
       responses:
         '200':
           description: OK
@@ -36,7 +36,7 @@ paths:
     get:
       tags: [playback]
       operationId: getNowPlaying
-      summary: Morceau en cours et état du lecteur
+      summary: Current track and player state
       responses:
         '200':
           description: OK
@@ -49,7 +49,7 @@ paths:
     post:
       tags: [playback]
       operationId: play
-      summary: Reprendre / démarrer la lecture
+      summary: Resume / start playback
       responses:
         '204': { description: OK }
 
@@ -57,7 +57,7 @@ paths:
     post:
       tags: [playback]
       operationId: pause
-      summary: Mettre en pause
+      summary: Pause playback
       responses:
         '204': { description: OK }
 
@@ -65,7 +65,7 @@ paths:
     post:
       tags: [playback]
       operationId: togglePlayPause
-      summary: Bascule play/pause
+      summary: Toggle play/pause
       responses:
         '204': { description: OK }
 
@@ -73,7 +73,7 @@ paths:
     post:
       tags: [playback]
       operationId: next
-      summary: Morceau suivant
+      summary: Next track
       responses:
         '204': { description: OK }
 
@@ -81,7 +81,7 @@ paths:
     post:
       tags: [playback]
       operationId: previous
-      summary: Morceau précédent
+      summary: Previous track
       responses:
         '204': { description: OK }
 
@@ -89,7 +89,7 @@ paths:
     post:
       tags: [playback]
       operationId: seek
-      summary: Aller à une position (en secondes)
+      summary: Seek to a position (in seconds)
       requestBody:
         required: true
         content:
@@ -108,7 +108,7 @@ paths:
     post:
       tags: [playback]
       operationId: setVolume
-      summary: Régler le volume (0..100)
+      summary: Set volume (0..100)
       requestBody:
         required: true
         content:
@@ -128,7 +128,7 @@ paths:
     get:
       tags: [queue]
       operationId: getQueue
-      summary: Récupérer la file d'attente Tidal (morceaux à venir)
+      summary: Get the Tidal queue (upcoming tracks)
       responses:
         '200':
           description: OK
@@ -141,7 +141,7 @@ paths:
     post:
       tags: [queue]
       operationId: enqueueTrack
-      summary: Ajouter un morceau à la file d'attente
+      summary: Add a track to the queue
       requestBody:
         required: true
         content:
@@ -152,14 +152,14 @@ paths:
               properties:
                 trackId:
                   type: string
-                  description: Identifiant Tidal du morceau
+                  description: Tidal track identifier
                 position:
                   type: string
                   enum: [end, next]
                   default: end
       responses:
         '200':
-          description: Élément ajouté
+          description: Item added
           content:
             application/json:
               schema:
@@ -169,7 +169,7 @@ paths:
     get:
       tags: [catalogue]
       operationId: search
-      summary: Rechercher dans le catalogue Tidal
+      summary: Search the Tidal catalogue
       parameters:
         - in: query
           name: q
@@ -179,7 +179,7 @@ paths:
           name: types
           schema:
             type: string
-            description: Types séparés par virgule (tracks,albums,artists,playlists)
+            description: Comma-separated types (tracks,albums,artists,playlists)
             default: tracks,albums,artists,playlists
         - in: query
           name: limit
@@ -229,10 +229,10 @@ paths:
     post:
       tags: [auth]
       operationId: startLogin
-      summary: Affiche la page de login Tidal dans la WebView (single login ; le token est ensuite capturé via interception des requêtes de la WebView)
+      summary: Displays the Tidal login page in the WebView (single login; the token is then captured by intercepting WebView requests)
       responses:
         '202':
-          description: WebView dirigée vers la page de login
+          description: WebView redirected to the login page
           content:
             application/json:
               schema:
@@ -244,19 +244,19 @@ paths:
     post:
       tags: [auth]
       operationId: logout
-      summary: Vide le localStorage / cookies de la WebView et la renvoie sur la page de login
+      summary: Clears the WebView localStorage / cookies and redirects to the login page
       responses:
         '204': { description: OK }
 
 components:
   responses:
     Unauthorized:
-      description: Pas authentifié auprès de Tidal
+      description: Not authenticated with Tidal
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     NotFound:
-      description: Ressource introuvable
+      description: Resource not found
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -295,7 +295,7 @@ components:
         isrc: { type: string }
         explicit: { type: boolean }
         coverUrl: { type: string, format: uri }
-        url: { type: string, format: uri, description: URL Tidal }
+        url: { type: string, format: uri, description: Tidal URL }
 
     Artist:
       type: object
@@ -351,7 +351,7 @@ components:
       type: object
       required: [id, trackId, addedAt]
       properties:
-        id: { type: string, description: Identifiant local de l'élément de file }
+        id: { type: string, description: Local identifier of the queue item }
         trackId: { type: string }
         addedAt: { type: string, format: date-time }
         track: { $ref: '#/components/schemas/Track' }
@@ -409,7 +409,7 @@ components:
         timestamp: { type: string, format: date-time }
 
     EventNowPlaying:
-      description: "Événement WebSocket — émis au changement de piste, ou lors d'une reprise depuis pause (pour que les clients qui rejoignent en cours de lecture reçoivent la piste courante au snapshot initial)."
+      description: "WebSocket event — emitted on track change, or when resuming from pause (so clients that join mid-playback receive the current track in the initial snapshot)."
       allOf:
         - $ref: '#/components/schemas/EventBase'
         - type: object
@@ -422,7 +422,7 @@ components:
                 track: { $ref: '#/components/schemas/Track' }
 
     EventPlaybackState:
-      description: "Événement WebSocket — émis uniquement lors d'un changement d'état (idle → playing, playing → paused, etc.). Ne se déclenche pas si la piste change sans changement d'état."
+      description: "WebSocket event — emitted only on state changes (idle → playing, playing → paused, etc.). Not triggered if the track changes without a state change."
       allOf:
         - $ref: '#/components/schemas/EventBase'
         - type: object
@@ -436,7 +436,7 @@ components:
                 state: { $ref: '#/components/schemas/PlaybackState' }
 
     EventPosition:
-      description: "Événement WebSocket — émis périodiquement pendant la lecture (~1×/s) avec la position courante dans le morceau."
+      description: "WebSocket event — emitted periodically during playback (~1×/s) with the current position in the track."
       allOf:
         - $ref: '#/components/schemas/EventBase'
         - type: object
@@ -451,7 +451,7 @@ components:
                 durationSeconds: { type: number }
 
     EventAuthChanged:
-      description: "Événement WebSocket — émis quand le token Tidal est capturé (connexion détectée dans la WebView) ou perdu (logout)."
+      description: "WebSocket event — emitted when the Tidal token is captured (login detected in the WebView) or lost (logout)."
       allOf:
         - $ref: '#/components/schemas/EventBase'
         - type: object
