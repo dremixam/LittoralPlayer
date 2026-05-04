@@ -145,7 +145,7 @@ function handleBridgeMessage(msg: BridgeMessage): void {
   const snap = msg.data as BridgeSnapshot;
   const track: Track | undefined = snap.track
     ? {
-        id: snap.track.id ?? `${snap.track.title}|${snap.track.artists.map(a => a.name).join(',')}`,
+        id: snap.track.id ?? '',
         title: snap.track.title,
         artists: snap.track.artists,
         album: snap.track.album,
@@ -299,7 +299,17 @@ async function pollOnce(): Promise<void> {
           'window.__tidalControl && window.__tidalControl.snapshot()',
         ));
     if (np) {
-      store.setNowPlaying({ state: np.state, track: np.track });
+      store.setNowPlaying({
+        state: np.state,
+        track: np.track,
+        positionSeconds: np.positionSeconds,
+        durationSeconds: np.durationSeconds,
+      });
+      // Source de position de secours (~1 Hz) si le timeupdate du bridge
+      // n'est pas encore accroche (media element deja dans le DOM a l'install).
+      if (typeof np.positionSeconds === 'number' && isFinite(np.positionSeconds)) {
+        store.emitPosition(np.positionSeconds, np.durationSeconds);
+      }
     }
   } catch { /* view may not be ready */ }
 }

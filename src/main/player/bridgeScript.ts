@@ -127,6 +127,9 @@ export const PLAYER_BRIDGE_SCRIPT = String.raw`
     if (el) attachMediaListeners(el);
   });
   mo.observe(document.documentElement, { childList: true, subtree: true });
+  // Accroche aussi les elements deja presents au moment de l'installation du bridge.
+  const existingMedia = findMediaElement();
+  if (existingMedia) attachMediaListeners(existingMedia);
 
   // Observe les changements de metadata mediaSession (changement de morceau)
   if (navigator.mediaSession) {
@@ -210,9 +213,11 @@ export const PLAYER_BRIDGE_SCRIPT = String.raw`
     // pour laisser snapshot() (mediaSession) prendre le relais.
     if (!track && state === 'idle') return null;
     const media = findMediaElement();
-    const positionSeconds = (typeof pc.latestCurrentTime === 'number')
-      ? pc.latestCurrentTime
-      : (media ? media.currentTime : 0);
+    const positionSeconds = (media && isFinite(media.currentTime) && media.currentTime > 0)
+      ? media.currentTime
+      : ((typeof pc.latestCurrentTime === 'number' && isFinite(pc.latestCurrentTime))
+          ? pc.latestCurrentTime
+          : 0);
     const durationSeconds = (track && track.durationSeconds) ||
       (media && isFinite(media.duration) ? media.duration : undefined);
     const volume = media ? Math.round((media.muted ? 0 : media.volume) * 100) : undefined;

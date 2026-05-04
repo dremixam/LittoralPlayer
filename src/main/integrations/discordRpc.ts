@@ -25,15 +25,32 @@ const RECONNECT_DELAY_MS = 30_000;
 let client: Client | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribe: (() => void) | null = null;
+// startTimestamp (ms) envoyé à Discord, sert à détecter les seeks par dérive.
+let lastSentStartMs: number | undefined;
+// Timer one-shot pour résynchroniser après un seek ou une reprise.
+// One-shot = on ne reset PAS si déjà en attente.
+let resyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleResync(delayMs: number): void {
+  if (resyncTimer !== null) return; // déjà planifié, on attend
+  resyncTimer = setTimeout(() => {
+    resyncTimer = null;
+    void updateActivity(store.nowPlaying);
+  }, delayMs);
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function buildActivity(np: NowPlaying): Parameters<NonNullable<Client['user']>['setActivity']>[0] {
-  const { state, track, positionSeconds, durationSeconds } = np;
+  const { state, track } = np;
+  const rawPos = np.positionSeconds;
+  const positionSeconds = (typeof rawPos === 'number' && isFinite(rawPos)) ? rawPos : undefined;
 
   if (!track) return {};
 
   const artists = track.artists.map(a => a.name).join(', ');
+  // Prefer NowPlaying duration (updated in real-time), fall back to track metadata.
+  const durationSeconds = np.durationSeconds ?? track.durationSeconds;
 
   const activity: Parameters<NonNullable<Client['user']>['setActivity']>[0] = {
     type: ActivityType.Listening,
@@ -47,14 +64,24 @@ function buildActivity(np: NowPlaying): Parameters<NonNullable<Client['user']>['
   if (track.coverUrl) {
     activity.largeImageKey = track.coverUrl;
   }
+  activity.smallImageKey = 'icon';
 
-  if (state === 'playing' && positionSeconds !== undefined) {
-    const startMs = Date.now() - positionSeconds * 1000;
+  if (state === 'playing') {
+    const startMs = Date.now() - (positionSeconds ?? 0) * 1000;
     activity.startTimestamp = startMs;
     if (durationSeconds) {
       activity.endTimestamp = startMs + durationSeconds * 1000;
     }
   }
+
+  // Boutons : jusqu'à 2 maximum selon l'API Discord RPC.
+  // On ne construit l'URL TIDAL que si track.id est un ID numérique valide
+  // (évite les URLs invalides quand l'id est un fallback "titre|artiste").
+  const buttons: { label: string; url: string }[] = [];
+  const tidalUrl = track.url ?? (/^\d+$/.test(track.id) ? `https://listen.tidal.com/track/${track.id}` : undefined);
+  if (tidalUrl) buttons.push({ label: 'Open in TIDAL', url: tidalUrl });
+  buttons.push({ label: 'Get Littoral Player', url: 'https://littoral.dremixam.com/' });
+  activity.buttons = buttons;
 
   return activity;
 }
@@ -63,10 +90,14 @@ async function updateActivity(np: NowPlaying): Promise<void> {
   if (!client?.user) return;
 
   try {
-    if (np.state === 'idle' || !np.track) {
+    if (np.state === 'idle' || np.state === 'paused' || !np.track) {
+      lastSentStartMs = undefined;
       await client.user.clearActivity(process.pid);
     } else {
-      await client.user.setActivity(buildActivity(np), process.pid);
+      const activity = buildActivity(np);
+      await client.user.setActivity(activity, process.pid);
+      // Mémorise le startTimestamp envoyé pour détecter les futurs seeks.
+      lastSentStartMs = typeof activity.startTimestamp === 'number' ? activity.startTimestamp : undefined;
     }
   } catch (err) {
     console.warn('[discord-rpc] updateActivity error:', err);
@@ -126,8 +157,19 @@ export function initDiscordRpc(): void {
 
   // Écoute les changements de piste et les changements d'état play/pause.
   unsubscribe = eventBus.onEvent(event => {
+    if (event.type === 'position') {
+      const actualPos = event.payload.positionSeconds;
+      const safeActual = (typeof actualPos === 'number' && isFinite(actualPos)) ? actualPos : NaN;
+      if (!isNaN(safeActual) && store.nowPlaying.state === 'playing' && lastSentStartMs !== undefined) {
+        const expectedPos = (Date.now() - lastSentStartMs) / 1000;
+        if (Math.abs(safeActual - expectedPos) > 3) {
+          scheduleResync(0);
+        }
+      }
+      return;
+    }
     if (event.type === 'now-playing' || event.type === 'playback-state') {
-      void updateActivity(store.nowPlaying);
+      scheduleResync(300);
     }
   });
 
@@ -146,6 +188,12 @@ export function destroyDiscordRpc(): void {
     reconnectTimer = null;
   }
 
+  if (resyncTimer !== null) {
+    clearTimeout(resyncTimer);
+    resyncTimer = null;
+  }
+
   client?.destroy();
   client = null;
+  lastSentStartMs = undefined;
 }
