@@ -27,7 +27,7 @@ export function App(): JSX.Element {
           setAuth(event.payload);
           break;
         case 'api-restarted':
-          setApiInfo(event.payload as ApiServerInfo);
+          setApiInfo(event.payload);
           break;
       }
     });

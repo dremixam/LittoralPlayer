@@ -67,7 +67,8 @@ export type AppEvent =
   // Émis uniquement lors d'un changement d'état du playback (play <-> pause).
   | { type: 'playback-state'; timestamp: string; payload: { state: PlaybackState } }
   | { type: 'position'; timestamp: string; payload: { positionSeconds: number; durationSeconds?: number } }
-  | { type: 'auth-changed'; timestamp: string; payload: AuthStatus };
+  | { type: 'auth-changed'; timestamp: string; payload: AuthStatus }
+  | { type: 'api-restarted'; timestamp: string; payload: ApiServerInfo };
 
 export type AppEventType = AppEvent['type'];
 

@@ -72,7 +72,7 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
     // Notify main window of updated API info
     const win = getMainWindow();
     if (win && !win.isDestroyed()) {
-      win.webContents.send(IPC_CHANNELS.appEvent, { type: 'api-restarted', payload: info });
+      win.webContents.send(IPC_CHANNELS.appEvent, { type: 'api-restarted', timestamp: new Date().toISOString(), payload: info });
     }
     return info;
   });
