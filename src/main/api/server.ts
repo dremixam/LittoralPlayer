@@ -8,7 +8,7 @@ import path from 'node:path';
 import { app as electronApp } from 'electron';
 import { handlers } from './handlers';
 import { attachWebSocket } from './ws';
-import { getApiPort, getCorsOrigins, getCorsAllowAll, getCorsAllowFileOrigin } from '../settings';
+import { getApiPort, getApiHost, getCorsOrigins, getCorsAllowAll, getCorsAllowFileOrigin } from '../settings';
 import type { ApiServerInfo } from '../../shared/models';
 
 let server: HttpServer | null = null;
@@ -72,7 +72,9 @@ export async function startApiServer(): Promise<ApiServerInfo> {
 
   // Swagger UI sur /docs
   try {
-    const spec = yaml.load(fs.readFileSync(specPath, 'utf8')) as object;
+    const spec = yaml.load(fs.readFileSync(specPath, 'utf8')) as Record<string, unknown>;
+    const displayHost = getApiHost() === '0.0.0.0' ? '127.0.0.1' : getApiHost();
+    spec.servers = [{ url: `http://${displayHost}:${getApiPort()}`, description: 'Local API' }];
     app.use('/docs', swaggerUi.serve, swaggerUi.setup(spec, {
       customSiteTitle: 'Littoral API',
     }));
@@ -105,13 +107,15 @@ export async function startApiServer(): Promise<ApiServerInfo> {
   attachWebSocket(httpServer);
 
   const port = getApiPort();
+  const host = getApiHost();
   await new Promise<void>((resolve, reject) => {
     httpServer.once('error', reject);
-    httpServer.listen(port, '127.0.0.1', () => resolve());
+    httpServer.listen(port, host, () => resolve());
   });
 
   server = httpServer;
-  serverInfo = { port, url: `http://127.0.0.1:${port}` };
+  const displayHost = host === '0.0.0.0' ? '127.0.0.1' : host;
+  serverInfo = { port, url: `http://${displayHost}:${port}` };
   console.log(`[api] listening on ${serverInfo.url} (WS: ${serverInfo.url.replace('http', 'ws')}/events)`);
   return serverInfo;
 }

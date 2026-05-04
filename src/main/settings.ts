@@ -16,6 +16,7 @@ export interface PersistedTokens {
 
 interface SettingsSchema {
   apiPort: number;
+  apiHost: string;
   tokens?: PersistedTokens;
   corsOrigins: string[];
   corsAllowAll: boolean;
@@ -24,6 +25,7 @@ interface SettingsSchema {
 
 const defaults: SettingsSchema = {
   apiPort: Number(process.env.TIDAL_API_PORT) || DEFAULT_API_PORT,
+  apiHost: '127.0.0.1',
   corsOrigins: DEFAULT_CORS_ORIGINS,
   corsAllowAll: false,
   corsAllowFileOrigin: true,
@@ -36,6 +38,18 @@ export const settings = new Store<SettingsSchema>({
 
 export function getApiPort(): number {
   return Number(process.env.TIDAL_API_PORT) || settings.get('apiPort');
+}
+
+export function setApiPort(port: number): void {
+  settings.set('apiPort', port);
+}
+
+export function getApiHost(): string {
+  return settings.get('apiHost');
+}
+
+export function setApiHost(host: string): void {
+  settings.set('apiHost', host);
 }
 
 export function getCorsOrigins(): string[] {

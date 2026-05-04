@@ -6,7 +6,8 @@ import { eventBus, store } from './state/store';
 import { getApiServerInfo } from './api/server';
 import { navigateToLogin, logout } from './auth/webviewToken';
 import { getPlayerView } from './player/controller';
-import { getCorsOrigins, addCorsOrigin, removeCorsOrigin, getCorsAllowAll, setCorsAllowAll, getCorsAllowFileOrigin, setCorsAllowFileOrigin } from './settings';
+import { getCorsOrigins, addCorsOrigin, removeCorsOrigin, getCorsAllowAll, setCorsAllowAll, getCorsAllowFileOrigin, setCorsAllowFileOrigin, getApiHost, setApiHost, getApiPort, setApiPort } from './settings';
+import { startApiServer, stopApiServer } from './api/server';
 
 let corsPanelWindow: BrowserWindow | null = null;
 
@@ -52,6 +53,30 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
     return removeCorsOrigin(origin);
   });
 
+  ipcMain.handle(IPC_CHANNELS.getApiHost, () => ({ host: getApiHost(), port: getApiPort() }));
+
+  ipcMain.handle(IPC_CHANNELS.setApiHost, (_e, host: unknown) => {
+    if (host !== '127.0.0.1' && host !== '0.0.0.0') return;
+    setApiHost(host as string);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.setApiPort, (_e, port: unknown) => {
+    const p = Number(port);
+    if (!Number.isInteger(p) || p < 1024 || p > 65535) return;
+    setApiPort(p);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.restartApiServer, async () => {
+    await stopApiServer();
+    const info = await startApiServer();
+    // Notify main window of updated API info
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send(IPC_CHANNELS.appEvent, { type: 'api-restarted', payload: info });
+    }
+    return info;
+  });
+
   ipcMain.handle(IPC_CHANNELS.getCorsAllowAll, () => getCorsAllowAll());
 
   ipcMain.handle(IPC_CHANNELS.setCorsAllowAll, (_e, value: unknown) => {
@@ -75,8 +100,8 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
     if (!mainWin) return;
 
     const { x, y, width } = mainWin.getBounds();
-    const panelWidth = 360;
-    const panelHeight = 420;
+    const panelWidth = 400;
+    const panelHeight = 520;
 
     corsPanelWindow = new BrowserWindow({
       width: panelWidth,

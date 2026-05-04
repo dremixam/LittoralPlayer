@@ -26,6 +26,9 @@ export function App(): JSX.Element {
         case 'auth-changed':
           setAuth(event.payload);
           break;
+        case 'api-restarted':
+          setApiInfo(event.payload as ApiServerInfo);
+          break;
       }
     });
     return off;
